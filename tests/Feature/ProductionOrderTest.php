@@ -23,9 +23,9 @@ class ProductionOrderTest extends TestCase
 
     private Site $factory;
 
-    private Product $fabric;
+    private Product $silk;
 
-    private Product $tshirt;
+    private Product $frock;
 
     protected function setUp(): void
     {
@@ -42,35 +42,38 @@ class ProductionOrderTest extends TestCase
         $this->factory = Site::create(['name' => 'Factory', 'code' => 'FAC-01', 'type' => 'Factory', 'status' => true]);
 
         $category = Category::create(['name' => 'Garments']);
-        $kg = Unit::create(['name' => 'Kilogram', 'short_name' => 'Kg']);
+        $roll = Unit::create(['name' => 'Roll', 'short_name' => 'Roll']);
         $pcs = Unit::create(['name' => 'Piece', 'short_name' => 'Pcs']);
 
-        $this->fabric = Product::create([
-            'name' => 'Cotton Jersey', 'sku' => 'FAB-1', 'category_id' => $category->id,
-            'stock_unit_id' => $kg->id, 'estimated_cost' => 0, 'selling_price' => 0, 'status' => true,
+        // Fabric is stocked in its own unit — here Roll.
+        $this->silk = Product::create([
+            'name' => 'Silk Fabric', 'sku' => 'FAB-1', 'category_id' => $category->id,
+            'stock_unit_id' => $roll->id, 'estimated_cost' => 0, 'selling_price' => 0, 'status' => true,
         ]);
-        $this->tshirt = Product::create([
-            'name' => 'Kids T-Shirt', 'sku' => 'KTS-1', 'category_id' => $category->id,
-            'stock_unit_id' => $pcs->id, 'estimated_cost' => 0, 'selling_price' => 250, 'status' => true,
+        $this->frock = Product::create([
+            'name' => 'Girls Frock', 'sku' => 'FRK-1', 'category_id' => $category->id,
+            'stock_unit_id' => $pcs->id, 'estimated_cost' => 0, 'selling_price' => 650, 'status' => true,
         ]);
 
-        // 50 Kg of fabric in stock at 400/Kg = 20,000.
+        // 20 rolls of silk in stock at 10,000 per roll.
         StockMovement::create([
-            'product_id' => $this->fabric->id, 'site_id' => $this->factory->id, 'type' => 'initial_stock',
-            'quantity' => 50, 'unit_cost' => 400, 'moved_at' => '2026-10-01', 'created_by' => $this->admin->id,
+            'product_id' => $this->silk->id, 'site_id' => $this->factory->id, 'type' => 'initial_stock',
+            'quantity' => 20, 'unit_cost' => 10000, 'moved_at' => '2026-10-01', 'created_by' => $this->admin->id,
         ]);
     }
 
-    private function startLot(): ProductionOrder
+    /**
+     * Creating a production = issuing the fabric and recording the cut.
+     */
+    private function createProduction(float $fabricUsed = 5, int $cut = 500)
     {
-        $this->post(route('production-orders.store'), [
+        return $this->post(route('production-orders.store'), [
             'site_id' => $this->factory->id,
-            'item' => "product-{$this->tshirt->id}",
-            'planned_quantity' => 200,
+            'item' => "product-{$this->frock->id}",
             'start_date' => '2026-10-02',
-        ])->assertRedirect();
-
-        return ProductionOrder::firstOrFail();
+            'cut_quantity' => $cut,
+            'fabrics' => [['item' => "product-{$this->silk->id}", 'quantity' => $fabricUsed]],
+        ]);
     }
 
     private function stage(ProductionOrder $order, string $stage, float $qty, array $materials = [])
@@ -89,64 +92,75 @@ class ProductionOrderTest extends TestCase
             ->selectRaw('COALESCE(SUM(debit) - SUM(credit), 0) as bal')->value('bal');
     }
 
-    public function test_pieces_flow_stage_by_stage_into_finished_stock(): void
+    public function test_creating_a_production_issues_fabric_and_records_cutting(): void
     {
-        $order = $this->startLot();
-        $this->assertSame('PRD-000001', $order->production_no);
+        $this->createProduction()->assertRedirect()->assertSessionHasNoErrors();
 
-        // Roll cut into 200 pcs, using all 50 Kg of fabric.
-        $this->stage($order, 'cutting', 200, [['item' => "product-{$this->fabric->id}", 'quantity' => 50]])
-            ->assertSessionHasNoErrors();
-        $this->stage($order, 'sewing', 100)->assertSessionHasNoErrors();
-        $this->stage($order, 'finishing', 50)->assertSessionHasNoErrors();
+        $order = ProductionOrder::firstOrFail();
+        $this->assertSame('PRD-000001', $order->production_no);
+        $this->assertEquals(['cutting' => 500, 'sewing' => 0, 'finishing' => 0], $order->stageTotals());
+
+        // 5 of the 20 rolls used; 15 left.
+        $this->assertEquals(15, StockMovement::balanceFor($this->silk->id, null, $this->factory->id));
+        $this->assertEquals(5, (float) $order->materials()->sum('quantity'));
+        $this->assertEquals(50000, $order->wipValue());
+    }
+
+    public function test_a_production_needs_fabric(): void
+    {
+        $this->post(route('production-orders.store'), [
+            'site_id' => $this->factory->id,
+            'item' => "product-{$this->frock->id}",
+            'start_date' => '2026-10-02',
+            'cut_quantity' => 500,
+        ])->assertSessionHasErrors('fabrics');
+
+        $this->createProduction(21)->assertSessionHasErrors('fabrics.0.quantity');
+
+        $this->assertSame(0, ProductionOrder::count());
+        $this->assertEquals(20, StockMovement::balanceFor($this->silk->id, null, $this->factory->id));
+    }
+
+    public function test_pieces_move_stage_by_stage_into_finished_stock(): void
+    {
+        $this->createProduction();
+        $order = ProductionOrder::firstOrFail();
+
+        $this->stage($order, 'sewing', 300)->assertSessionHasNoErrors();
+        $this->stage($order, 'finishing', 200)->assertSessionHasNoErrors();
 
         $totals = $order->stageTotals();
-        $this->assertEquals(['cutting' => 200, 'sewing' => 100, 'finishing' => 50], $totals);
-        $this->assertEquals(100, $order->availableFor('sewing', $totals));
-        $this->assertEquals(50, $order->availableFor('finishing', $totals));
+        $this->assertEquals(['cutting' => 500, 'sewing' => 300, 'finishing' => 200], $totals);
+        $this->assertEquals(200, $order->availableFor('sewing', $totals));
+        $this->assertEquals(100, $order->availableFor('finishing', $totals));
 
-        // Fabric used up; only finished pieces are in stock.
-        $this->assertEquals(0, StockMovement::balanceFor($this->fabric->id, null, $this->factory->id));
-        $this->assertEquals(50, StockMovement::balanceFor($this->tshirt->id, null, $this->factory->id));
-
-        // 20,000 ÷ 200 pcs = 100 per piece.
-        $this->assertEquals(100, (float) $this->tshirt->fresh()->estimated_cost);
+        // 50,000 of silk ÷ 500 pcs = 100 per piece.
+        $this->assertEquals(200, StockMovement::balanceFor($this->frock->id, null, $this->factory->id));
+        $this->assertEquals(100, (float) $this->frock->fresh()->estimated_cost);
+        $this->assertEquals(30000, $this->balance('work_in_progress'));
         // Opening stock above was posted without a voucher, so Inventory
-        // shows only this lot: −20,000 issued to WIP + 5,000 finished.
-        $this->assertEquals(-15000, $this->balance('inventory'));
-        $this->assertEquals(15000, $this->balance('work_in_progress'));
-        $this->assertEquals(15000, $order->wipValue());
+        // shows only this lot: −50,000 issued to WIP + 20,000 finished.
+        $this->assertEquals(-30000, $this->balance('inventory'));
     }
 
     public function test_a_stage_cannot_take_more_than_the_previous_stage_handed_over(): void
     {
-        $order = $this->startLot();
-        $this->stage($order, 'cutting', 200);
-        $this->stage($order, 'sewing', 100);
+        $this->createProduction();
+        $order = ProductionOrder::firstOrFail();
+        $this->stage($order, 'sewing', 300);
 
-        $this->stage($order, 'sewing', 101)->assertSessionHasErrors('quantity');
-        $this->stage($order, 'finishing', 101)->assertSessionHasErrors('quantity');
+        $this->stage($order, 'sewing', 201)->assertSessionHasErrors('quantity');
+        $this->stage($order, 'finishing', 301)->assertSessionHasErrors('quantity');
 
-        $this->assertEquals(['cutting' => 200, 'sewing' => 100, 'finishing' => 0], $order->stageTotals());
+        $this->assertEquals(['cutting' => 500, 'sewing' => 300, 'finishing' => 0], $order->stageTotals());
     }
 
-    public function test_material_issue_cannot_exceed_stock(): void
+    public function test_completing_a_production_writes_off_unfinished_wip(): void
     {
-        $order = $this->startLot();
-
-        $this->stage($order, 'cutting', 200, [['item' => "product-{$this->fabric->id}", 'quantity' => 51]])
-            ->assertSessionHasErrors('materials.0.quantity');
-
-        $this->assertSame(0, $order->stageEntries()->count());
-        $this->assertEquals(50, StockMovement::balanceFor($this->fabric->id, null, $this->factory->id));
-    }
-
-    public function test_completing_a_lot_writes_off_unfinished_wip(): void
-    {
-        $order = $this->startLot();
-        $this->stage($order, 'cutting', 200, [['item' => "product-{$this->fabric->id}", 'quantity' => 50]]);
-        $this->stage($order, 'sewing', 200);
-        $this->stage($order, 'finishing', 190);
+        $this->createProduction();
+        $order = ProductionOrder::firstOrFail();
+        $this->stage($order, 'sewing', 500);
+        $this->stage($order, 'finishing', 490);
 
         $this->post(route('production-orders.complete', $order))->assertRedirect();
 
@@ -156,16 +170,23 @@ class ProductionOrderTest extends TestCase
         $this->assertEquals(0, $this->balance('work_in_progress'));
         $this->assertEquals(1000, $this->balance('production_wastage_expense'));
 
-        $this->stage($order, 'cutting', 10)->assertSessionHas('error');
+        $this->stage($order, 'sewing', 1)->assertSessionHas('error');
     }
 
     public function test_production_screens_render(): void
     {
-        $order = $this->startLot();
-        $this->stage($order, 'cutting', 200, [['item' => "product-{$this->fabric->id}", 'quantity' => 50]]);
+        $this->createProduction();
+        $order = ProductionOrder::firstOrFail();
+        $this->stage($order, 'sewing', 300);
 
         $this->get(route('production-orders.index'))->assertOk()->assertSee($order->production_no);
+        $this->get(route('production-orders.index', ['q' => 'PRD-000001']))->assertOk()->assertSee('Girls Frock');
+        $this->get(route('production-orders.index', ['q' => 'PRD-999']))->assertOk()->assertDontSee('Girls Frock');
         $this->get(route('production-orders.create'))->assertOk();
-        $this->get(route('production-orders.show', $order))->assertOk()->assertSee('waiting for sewing');
+        $this->get(route('production-orders.create', ['site_id' => $this->factory->id]))->assertOk()->assertSee('Silk Fabric');
+        $this->get(route('production-orders.show', $order))->assertOk()
+            ->assertSee('PRD-000001')
+            ->assertSee('Fabric Used')
+            ->assertSee('Waiting for sewing');
     }
 }
