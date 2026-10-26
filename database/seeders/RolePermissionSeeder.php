@@ -22,6 +22,7 @@ class RolePermissionSeeder extends Seeder
     protected array $modules = [
         'inventory' => ['view', 'create', 'edit', 'delete', 'approve'],
         'parties'   => ['view', 'create', 'edit', 'delete'],
+        'sales'     => ['view', 'create', 'edit', 'approve'],
         'accounts'  => ['view', 'create', 'edit', 'delete', 'approve'],
         'projects'  => ['view', 'create', 'edit', 'delete'],
         'tasks'     => ['view', 'create', 'edit', 'delete'],
@@ -57,6 +58,7 @@ class RolePermissionSeeder extends Seeder
         Role::findOrCreate('Manager')->syncPermissions([
             'inventory.view', 'inventory.create', 'inventory.edit', 'inventory.approve',
             'parties.view', 'parties.create', 'parties.edit',
+            'sales.view', 'sales.create', 'sales.edit', 'sales.approve',
             'projects.view', 'projects.create', 'projects.edit',
             'tasks.view', 'tasks.create', 'tasks.edit',
             // "Manager (own team only)" — view/approve their direct reports'

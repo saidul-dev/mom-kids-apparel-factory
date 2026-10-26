@@ -28,6 +28,7 @@ class LedgerTransaction extends Model
         'internal_consumption',
         'purchase',
         'production',
+        'sale',
     ];
 
     /**
@@ -47,6 +48,7 @@ class LedgerTransaction extends Model
         'internal_consumption' => 'ICN',
         'purchase' => 'PUR',
         'production' => 'PRD',
+        'sale' => 'SAL',
     ];
 
     /**
@@ -67,6 +69,7 @@ class LedgerTransaction extends Model
         'internal_consumption' => 'Internal Consumption',
         'purchase' => 'Purchase',
         'production' => 'Production',
+        'sale' => 'Sale',
     ];
 
     protected $fillable = [

@@ -32,6 +32,7 @@ use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SalaryStructureController;
+use App\Http\Controllers\Admin\SalesOrderController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SiteHealthController;
 use App\Http\Controllers\Admin\SiteController;
@@ -117,6 +118,12 @@ Route::prefix('admin')->group(function () {
             ->parameters(['production-orders' => 'productionOrder']);
         Route::post('/production-orders/{productionOrder}/stages', [ProductionOrderController::class, 'storeStage'])->name('production-orders.stages.store');
         Route::post('/production-orders/{productionOrder}/complete', [ProductionOrderController::class, 'complete'])->name('production-orders.complete');
+
+        // Customer orders from the Factory / wholesale Outlet: Order -> Deliver.
+        Route::resource('sales-orders', SalesOrderController::class)->only(['index', 'create', 'store', 'show'])
+            ->parameters(['sales-orders' => 'salesOrder']);
+        Route::post('/sales-orders/{salesOrder}/deliver', [SalesOrderController::class, 'deliver'])->name('sales-orders.deliver');
+        Route::post('/sales-orders/{salesOrder}/cancel', [SalesOrderController::class, 'cancel'])->name('sales-orders.cancel');
 
         Route::resource('parties', PartyController::class)->except('show');
         Route::patch('/parties/{party}/toggle-status', [PartyController::class, 'toggleStatus'])->name('parties.toggle-status');
