@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\PayrollRunController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProfitLossController;
 use App\Http\Controllers\Admin\ProjectController;
+use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SalaryStructureController;
 use App\Http\Controllers\Admin\SettingController;
@@ -106,6 +107,9 @@ Route::prefix('admin')->group(function () {
         Route::get('/stock/transfers/{transfer}', [StockTransferController::class, 'show'])->name('stock.transfers.show');
         Route::post('/stock/transfers/{transfer}/receive', [StockTransferController::class, 'receive'])->name('stock.transfers.receive');
         Route::post('/stock/transfers/{transfer}/cancel', [StockTransferController::class, 'cancel'])->name('stock.transfers.cancel');
+
+        // Fabric / raw material purchases — see docs/garments-production.md.
+        Route::resource('purchases', PurchaseController::class)->only(['index', 'create', 'store', 'show']);
 
         Route::resource('parties', PartyController::class)->except('show');
         Route::patch('/parties/{party}/toggle-status', [PartyController::class, 'toggleStatus'])->name('parties.toggle-status');
