@@ -51,7 +51,7 @@
                                 <template x-for="(valueId, attrId) in variant.values" :key="attrId">
                                     <input type="hidden" :name="'variants[' + i + '][values][' + attrId + ']'" :value="valueId">
                                 </template>
-                                <input type="text" :name="'variants[' + i + '][sku]'" x-model="variant.sku" required
+                                <input type="text" :name="'variants[' + i + '][sku]'" x-model="variant.sku" placeholder="{{ __('auto') }}"
                                        class="block w-32 rounded-lg border-slate-300 text-sm focus:border-accent-500 focus:ring-accent-500">
                             </td>
                             <td class="py-2 pr-3">

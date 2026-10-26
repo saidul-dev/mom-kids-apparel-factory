@@ -18,6 +18,7 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller implements HasMiddleware
@@ -67,6 +68,7 @@ class ProductController extends Controller implements HasMiddleware
         }
 
         $product = DB::transaction(function () use ($validated, $variants) {
+            $validated['sku'] = filled($validated['sku'] ?? null) ? $validated['sku'] : Product::nextSku($validated['type']);
             $product = Product::create(collect($validated)->except(['image', 'gallery_images', 'remove_gallery_ids'])->all());
             if ($product->has_variants) {
                 $this->syncVariants($product, $variants);
@@ -93,6 +95,11 @@ class ProductController extends Controller implements HasMiddleware
     {
         $validated = $this->validated($request, $product);
         $variants = $validated['has_variants'] ? $this->validateVariants($request, $product) : [];
+
+        // SKU isn't editable on the form — keep the existing one.
+        if (blank($validated['sku'] ?? null)) {
+            unset($validated['sku']);
+        }
 
         // Estimated cost is only a manual starting reference before this
         // product has any stock movement history — once it does, cost is
@@ -282,7 +289,8 @@ class ProductController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(array_keys(Product::TYPES))],
-            'sku' => ['required', 'string', 'max:100', Rule::unique('products', 'sku')->ignore($product?->id)],
+            // Auto-generated from the type when left out (see Product::nextSku()).
+            'sku' => ['nullable', 'string', 'max:100', Rule::unique('products', 'sku')->ignore($product?->id)],
             'barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')->ignore($product?->id)],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'brand_id' => ['nullable', 'integer', 'exists:brands,id'],
@@ -357,8 +365,12 @@ class ProductController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer'],
-            'variants.*.sku' => ['required', 'string', 'max:100', 'distinct',
+            // Blank = auto (parent SKU + variant label) — see syncVariants().
+            'variants.*.sku' => ['nullable', 'string', 'max:100', 'distinct',
                 function ($attr, $value, $fail) use ($ignoreIds) {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
                     $exists = ProductVariant::where('sku', $value)->whereNotIn('id', $ignoreIds)->exists();
                     if ($exists) {
                         $fail('This SKU is already in use.');
@@ -394,7 +406,7 @@ class ProductController extends Controller implements HasMiddleware
 
         foreach ($variants as $row) {
             $attributes = [
-                'sku' => $row['sku'],
+                'sku' => filled($row['sku'] ?? null) ? $row['sku'] : null,
                 'barcode' => $row['barcode'] ?? null,
                 'selling_price' => $row['selling_price'],
                 'estimated_cost' => $row['estimated_cost'] ?? null,
@@ -411,9 +423,14 @@ class ProductController extends Controller implements HasMiddleware
                     unset($attributes['estimated_cost']);
                 }
 
+                // Blank SKU on an existing variant keeps whatever it already has.
+                if ($attributes['sku'] === null) {
+                    unset($attributes['sku']);
+                }
+
                 $variant->update($attributes);
             } else {
-                $variant = $product->variants()->create($attributes);
+                $variant = $product->variants()->create(['sku' => $attributes['sku'] ?? 'PENDING-'.Str::uuid()] + $attributes);
             }
 
             $keepIds[] = $variant->id;
@@ -423,6 +440,10 @@ class ProductController extends Controller implements HasMiddleware
             foreach ($row['values'] as $attributeId => $valueId) {
                 $variant->attributeValues()->attach($valueId, ['attribute_id' => (int) $attributeId]);
             }
+
+            if (blank($row['sku'] ?? null) && (empty($row['id']) || str_starts_with($variant->sku, 'PENDING-'))) {
+                $variant->update(['sku' => $this->variantSku($product, $variant->load('attributeValues'))]);
+            }
         }
 
         // Remove variants no longer present.
@@ -430,6 +451,23 @@ class ProductController extends Controller implements HasMiddleware
             $variant->attributeValues()->detach();
             $variant->delete();
         });
+    }
+
+    /**
+     * Auto SKU for a variant: parent SKU + its attribute values, e.g.
+     * FG-00003-M or FG-00003-RED-M, suffixed -2, -3… if already taken.
+     */
+    protected function variantSku(Product $product, ProductVariant $variant): string
+    {
+        $suffix = $variant->attributeValues->pluck('value')->map(fn ($v) => Str::upper(Str::slug($v)))->implode('-');
+        $base = $suffix !== '' ? "{$product->sku}-{$suffix}" : "{$product->sku}-{$variant->id}";
+
+        $sku = $base;
+        for ($n = 2; ProductVariant::where('sku', $sku)->where('id', '!=', $variant->id)->exists(); $n++) {
+            $sku = "{$base}-{$n}";
+        }
+
+        return $sku;
     }
 
     /**

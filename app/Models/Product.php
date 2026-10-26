@@ -127,6 +127,30 @@ class Product extends Model
         return $this->hasMany(StockMovement::class);
     }
 
+    /**
+     * SKU prefix per type — see nextSku().
+     */
+    public const SKU_PREFIXES = [
+        'raw_material' => 'RM',
+        'finished_good' => 'FG',
+    ];
+
+    /**
+     * Next auto SKU for a type, e.g. RM-00007 / FG-00012: one past the
+     * highest number already used under that prefix (manual SKUs that
+     * don't follow the pattern are ignored).
+     */
+    public static function nextSku(string $type): string
+    {
+        $prefix = self::SKU_PREFIXES[$type] ?? 'PRD';
+
+        $max = static::where('sku', 'like', "{$prefix}-%")->pluck('sku')
+            ->map(fn ($sku) => preg_match('/^'.$prefix.'-(\d+)$/', $sku, $m) ? (int) $m[1] : 0)
+            ->max() ?? 0;
+
+        return sprintf('%s-%05d', $prefix, $max + 1);
+    }
+
     public function getTypeLabelAttribute(): string
     {
         return self::TYPES[$this->type] ?? $this->type;

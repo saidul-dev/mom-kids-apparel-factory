@@ -88,10 +88,17 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-                <x-input-label for="sku" :value="__('Code / SKU')" />
-                <x-text-input id="sku" name="sku" type="text" class="mt-1 block w-full"
-                              :value="old('sku', $product->sku ?? '')" required
-                              x-bind:placeholder="type === 'raw_material' ? 'RM-SILK-01' : 'FRK-01'" />
+                <x-input-label :value="__('Code / SKU')" />
+                {{-- Never typed: generated from the type on create (Product::nextSku()). --}}
+                @if ($editing)
+                <div class="mt-1 flex h-[42px] items-center rounded-lg bg-slate-50 px-3 font-mono text-sm font-semibold text-slate-700 ring-1 ring-slate-200">{{ $product->sku }}</div>
+                @else
+                <div class="mt-1 flex h-[42px] items-center justify-between rounded-lg bg-slate-50 px-3 ring-1 ring-slate-200">
+                    <span class="font-mono text-sm font-semibold text-slate-700"
+                          x-text="type === 'raw_material' ? @js(\App\Models\Product::nextSku('raw_material')) : @js(\App\Models\Product::nextSku('finished_good'))"></span>
+                    <span class="text-[11px] font-medium text-slate-400">{{ __('auto') }}</span>
+                </div>
+                @endif
                 <x-input-error class="mt-2" :messages="$errors->get('sku')" />
             </div>
             <div x-show="type === 'finished_good'" x-cloak>
@@ -135,15 +142,14 @@
         </div>
     </div>
 
-    @if ($ecommerceEnabled ?? false)
-    <!-- Product Gallery -->
-    <div class="lg:col-span-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200"
+    <!-- More photos (finished goods) -->
+    <div class="lg:col-span-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200" x-show="type === 'finished_good'" x-cloak
          x-data="productGallery({
             existing: @js(($product->images ?? collect())->map(fn ($img) => ['id' => $img->id, 'url' => $img->url])),
          })">
         <div class="mb-4">
-            <h3 class="font-bold text-brand-900">{{ __('Product Gallery') }}</h3>
-            <p class="text-xs text-slate-400">{{ __('Extra photos shown on the online store\'s product page, in addition to the main Product Image above. PNG or JPG, up to 2MB each.') }}</p>
+            <h3 class="font-bold text-brand-900">{{ __('More Photos') }}</h3>
+            <p class="text-xs text-slate-400">{{ __('Front, back, details, on-model… add as many as you like. The Image above stays the main photo. PNG or JPG, up to 2MB each.') }}</p>
         </div>
 
         <div class="flex flex-wrap gap-3">
@@ -171,15 +177,17 @@
                 </div>
             </template>
 
-            <label class="grid h-24 w-24 shrink-0 cursor-pointer place-items-center rounded-xl border border-dashed border-slate-300 text-slate-400 hover:bg-slate-50">
-                <span class="text-center text-[11px] font-semibold leading-tight">{{ __('Add Photos') }}</span>
+            <label class="grid h-24 w-24 shrink-0 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600">
+                <span class="flex flex-col items-center gap-1 text-center text-[11px] font-semibold leading-tight">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    {{ __('Add Photos') }}
+                </span>
                 <input type="file" name="gallery_images[]" x-ref="galleryInput" accept="image/*" multiple class="hidden" @change="addFiles($event.target.files)">
             </label>
         </div>
         <x-input-error class="mt-3" :messages="$errors->get('gallery_images')" />
         <x-input-error class="mt-1" :messages="$errors->get('gallery_images.*')" />
     </div>
-    @endif
 
     <!-- Price & stock -->
     <div class="lg:col-span-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
