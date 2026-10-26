@@ -18,16 +18,20 @@ trait ResolvesStockItems
     /**
      * Every active simple product / variant as a picker option. With a
      * $siteId each option carries its live balance there; $inStockOnly
-     * additionally drops anything with nothing on hand.
+     * additionally drops anything with nothing on hand; $type limits it
+     * to one Product::TYPES key (raw_material / finished_good).
      */
-    protected function stockItemOptions(?int $siteId = null, bool $inStockOnly = false): Collection
+    protected function stockItemOptions(?int $siteId = null, bool $inStockOnly = false, ?string $type = null): Collection
     {
         $products = Product::with('stockUnit')
-            ->where('status', true)->where('has_variants', false)->orderBy('name')->get();
+            ->where('status', true)->where('has_variants', false)
+            ->when($type, fn ($q) => $q->where('type', $type))
+            ->orderBy('name')->get();
 
         $variants = ProductVariant::with(['product.stockUnit', 'attributeValues'])
             ->where('status', true)
-            ->whereHas('product', fn ($q) => $q->where('status', true)->where('has_variants', true))
+            ->whereHas('product', fn ($q) => $q->where('status', true)->where('has_variants', true)
+                ->when($type, fn ($q) => $q->where('type', $type)))
             ->get();
 
         $simpleBalances = collect();

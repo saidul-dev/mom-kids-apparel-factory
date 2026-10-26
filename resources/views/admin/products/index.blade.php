@@ -4,10 +4,10 @@
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div>
                 <h2 class="text-2xl font-bold text-brand-900">{{ __('Products') }}</h2>
-                <p class="text-sm text-slate-500 mt-0.5">{{ __('Product catalogue — global master data, not tied to a specific site') }}</p>
+                <p class="text-sm text-slate-500 mt-0.5">{{ __('Raw materials and finished goods') }}</p>
             </div>
             @can('inventory.create')
-            <a href="{{ route('products.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus:ring-2 focus:ring-accent-500 focus:ring-offset-2">
+            <a href="{{ route('products.create', $type ? ['type' => $type] : []) }}" class="inline-flex items-center gap-2 rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus:ring-2 focus:ring-accent-500 focus:ring-offset-2">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                 {{ __('Add Product') }}
             </a>
@@ -15,13 +15,26 @@
         </div>
     </x-slot>
 
-    <form method="GET" action="{{ route('products.index') }}" class="mb-4 max-w-md">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+        @foreach (['' => __('All'), 'raw_material' => __('Raw Material'), 'finished_good' => __('Finished Goods')] as $key => $label)
+        <a href="{{ route('products.index', array_filter(['type' => $key, 'q' => request('q')])) }}"
+           class="rounded-lg px-4 py-1.5 text-sm font-semibold transition {{ ($type ?? '') === $key ? 'bg-brand-800 text-white' : 'text-slate-600 hover:bg-slate-50' }}">
+            {{ $label }}
+            <span class="ml-1 text-xs {{ ($type ?? '') === $key ? 'text-brand-200' : 'text-slate-400' }}">{{ $key === '' ? $typeCounts->sum() : ($typeCounts[$key] ?? 0) }}</span>
+        </a>
+        @endforeach
+    </div>
+
+    <form method="GET" action="{{ route('products.index') }}" class="w-full max-w-sm">
+        @if ($type)<input type="hidden" name="type" value="{{ $type }}">@endif
         <div class="relative">
             <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
             <input type="search" name="q" value="{{ request('q') }}" placeholder="{{ __('Search by name, SKU or barcode…') }}"
                    class="w-full rounded-lg border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:border-accent-500 focus:ring-accent-500 placeholder:text-slate-400">
         </div>
     </form>
+    </div>
 
     <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
         <div class="overflow-x-auto">
@@ -31,7 +44,7 @@
                     <th class="px-5 py-3 font-semibold">{{ __('Product') }}</th>
                     <th class="px-5 py-3 font-semibold">{{ __('SKU') }}</th>
                     <th class="px-5 py-3 font-semibold">{{ __('Category') }}</th>
-                    <th class="px-5 py-3 font-semibold">{{ __('Brand') }}</th>
+                    <th class="px-5 py-3 font-semibold">{{ __('Type') }}</th>
                     <th class="px-5 py-3 font-semibold">{{ __('Unit') }}</th>
                     <th class="px-5 py-3 font-semibold text-right">{{ __('Cost') }}</th>
                     <th class="px-5 py-3 font-semibold text-right">{{ __('Price') }}</th>
@@ -56,10 +69,16 @@
                     </td>
                     <td class="px-5 py-3 text-slate-600">{{ $product->sku }}</td>
                     <td class="px-5 py-3 text-slate-600">{{ $product->category->name ?? '—' }}</td>
-                    <td class="px-5 py-3 text-slate-600">{{ $product->brand->name ?? '—' }}</td>
+                    <td class="px-5 py-3">
+                        @if ($product->isRawMaterial())
+                        <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">{{ __('Raw Material') }}</span>
+                        @else
+                        <span class="inline-flex rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">{{ __('Finished Goods') }}</span>
+                        @endif
+                    </td>
                     <td class="px-5 py-3 text-slate-600">{{ $product->stockUnit->short_name ?? '—' }}</td>
                     <td class="px-5 py-3 text-right text-slate-600">{{ number_format($product->estimated_cost, 2) }}</td>
-                    <td class="px-5 py-3 text-right font-semibold text-slate-800">{{ number_format($product->selling_price, 2) }}</td>
+                    <td class="px-5 py-3 text-right font-semibold text-slate-800">{{ $product->isRawMaterial() ? '—' : number_format($product->selling_price, 2) }}</td>
                     <td class="px-5 py-3">
                         @can('inventory.edit')
                         <form method="POST" action="{{ route('products.toggle-status', $product) }}">

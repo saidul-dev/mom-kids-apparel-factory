@@ -9,8 +9,18 @@ use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
+    /**
+     * Raw material is consumed by production; finished goods are what
+     * production makes and sales sell. Plain string column, no BOM.
+     */
+    public const TYPES = [
+        'raw_material' => 'Raw Material',
+        'finished_good' => 'Finished Goods',
+    ];
+
     protected $fillable = [
         'name',
+        'type',
         'sku',
         'barcode',
         'category_id',
@@ -115,6 +125,16 @@ class Product extends Model
     public function stockMovements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    public function getTypeLabelAttribute(): string
+    {
+        return self::TYPES[$this->type] ?? $this->type;
+    }
+
+    public function isRawMaterial(): bool
+    {
+        return $this->type === 'raw_material';
     }
 
     public function isVariable(): bool

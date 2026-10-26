@@ -63,7 +63,7 @@ class SalesOrderController extends Controller implements HasMiddleware
 
         // Every item is orderable (an order can be taken before production
         // finishes) — stock is only enforced on delivery.
-        $itemOptions = $site ? $this->stockItemOptions($site->id) : collect();
+        $itemOptions = $site ? $this->stockItemOptions($site->id, false, 'finished_good') : collect();
 
         return view('admin.sales-orders.create', compact('sites', 'customers', 'site', 'itemOptions'));
     }
@@ -91,8 +91,8 @@ class SalesOrderController extends Controller implements HasMiddleware
         foreach ($validated['items'] as $i => $row) {
             [$product, $variant] = $this->resolveItem($row['item']);
 
-            if (! $product) {
-                throw ValidationException::withMessages(["items.{$i}.item" => 'Pick a valid product or variant.']);
+            if (! $product || $product->isRawMaterial()) {
+                throw ValidationException::withMessages(["items.{$i}.item" => 'Pick a finished goods item.']);
             }
 
             $rows[] = [

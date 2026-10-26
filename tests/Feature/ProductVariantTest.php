@@ -68,6 +68,7 @@ class ProductVariantTest extends TestCase
 
         return [
             'name' => 'Polo',
+            'type' => 'finished_good',
             'sku' => 'POLO',
             'category_id' => $category->id,
             'stock_unit_id' => $unit->id,
@@ -144,7 +145,7 @@ class ProductVariantTest extends TestCase
 
         $this->actingAs($this->admin())
             ->put(route('products.update', $product), [
-                'name' => 'Polo', 'sku' => 'POLO', 'category_id' => $product->category_id,
+                'name' => 'Polo', 'type' => 'finished_good', 'sku' => 'POLO', 'category_id' => $product->category_id,
                 'stock_unit_id' => $product->stock_unit_id, 'purchase_unit_conversion' => 1,
                 'sale_unit_conversion' => 1, 'estimated_cost' => 100, 'selling_price' => 150,
                 'reorder_level' => 0, 'has_variants' => '0',

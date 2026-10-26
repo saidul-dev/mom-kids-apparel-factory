@@ -34,7 +34,10 @@ class ProductController extends Controller implements HasMiddleware
 
     public function index(Request $request)
     {
+        $type = array_key_exists($request->get('type'), Product::TYPES) ? $request->get('type') : null;
+
         $products = Product::with(['category', 'brand', 'stockUnit'])
+            ->when($type, fn ($q) => $q->where('type', $type))
             ->when($request->filled('q'), fn ($q) => $q->where(function ($q) use ($request) {
                 $q->where('name', 'like', "%{$request->q}%")
                     ->orWhere('sku', 'like', "%{$request->q}%")
@@ -44,7 +47,9 @@ class ProductController extends Controller implements HasMiddleware
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.products.index', compact('products'));
+        $typeCounts = Product::selectRaw('type, COUNT(*) as total')->groupBy('type')->pluck('total', 'type');
+
+        return view('admin.products.index', compact('products', 'type', 'typeCounts'));
     }
 
     public function create()
@@ -109,7 +114,7 @@ class ProductController extends Controller implements HasMiddleware
             $validated['image_path'] = $request->file('image')->store('products', 'public');
         }
 
-        DB::transaction(function () use ($request, $product, $validated, $variants) {
+        DB::transaction(function () use ($product, $validated, $variants) {
             $product->update(collect($validated)->except(['image', 'remove_image', 'gallery_images', 'remove_gallery_ids'])->all());
 
             if ($product->has_variants) {
@@ -276,15 +281,18 @@ class ProductController extends Controller implements HasMiddleware
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'type' => ['required', Rule::in(array_keys(Product::TYPES))],
             'sku' => ['required', 'string', 'max:100', Rule::unique('products', 'sku')->ignore($product?->id)],
             'barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')->ignore($product?->id)],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'brand_id' => ['nullable', 'integer', 'exists:brands,id'],
             'stock_unit_id' => ['required', 'integer', 'exists:units,id'],
             'purchase_unit_id' => ['nullable', 'integer', 'exists:units,id'],
-            'purchase_unit_conversion' => ['required', 'numeric', 'min:0.0001'],
+            // Purchase/Sale units aren't on the form any more (everything is
+            // bought, made and sold in its Stock Unit) — default to 1:1.
+            'purchase_unit_conversion' => ['nullable', 'numeric', 'min:0.0001'],
             'sale_unit_id' => ['nullable', 'integer', 'exists:units,id'],
-            'sale_unit_conversion' => ['required', 'numeric', 'min:0.0001'],
+            'sale_unit_conversion' => ['nullable', 'numeric', 'min:0.0001'],
             // Trix's HTML output carries markup overhead beyond the visible
             // text, so this needs far more headroom than a plain textarea.
             // Only ever posted when the form's e-commerce section is shown.
@@ -310,6 +318,9 @@ class ProductController extends Controller implements HasMiddleware
             'guarantee_period' => ['nullable', 'integer', 'min:1'],
             'guarantee_unit' => ['nullable', 'required_with:guarantee_period', 'in:days,months,years'],
         ]);
+
+        $validated['purchase_unit_conversion'] ??= 1;
+        $validated['sale_unit_conversion'] ??= 1;
 
         // Normalize booleans (unchecked checkboxes are absent from the request).
         foreach (['has_variants', 'track_batch', 'track_expiry', 'track_serial'] as $flag) {

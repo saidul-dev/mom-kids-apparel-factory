@@ -47,7 +47,7 @@ class ProductionOrderTest extends TestCase
 
         // Fabric is stocked in its own unit — here Roll.
         $this->silk = Product::create([
-            'name' => 'Silk Fabric', 'sku' => 'FAB-1', 'category_id' => $category->id,
+            'name' => 'Silk Fabric', 'type' => 'raw_material', 'sku' => 'FAB-1', 'category_id' => $category->id,
             'stock_unit_id' => $roll->id, 'estimated_cost' => 0, 'selling_price' => 0, 'status' => true,
         ]);
         $this->frock = Product::create([

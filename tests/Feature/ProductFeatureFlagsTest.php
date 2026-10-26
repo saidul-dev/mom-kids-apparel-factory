@@ -30,6 +30,7 @@ class ProductFeatureFlagsTest extends TestCase
 
         return array_merge([
             'name' => 'Basic Product',
+            'type' => 'finished_good',
             'sku' => 'BASIC-1',
             'category_id' => $category->id,
             'stock_unit_id' => $unit->id,

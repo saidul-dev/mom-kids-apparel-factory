@@ -102,8 +102,8 @@ class ProductionOrderController extends Controller implements HasMiddleware
         $site = $request->filled('site_id') ? Site::findOrFail($request->integer('site_id')) : null;
 
         // searchable-select reads ->id / ->name, so hand it objects.
-        $items = $this->stockItemOptions()->map(fn ($o) => (object) $o);
-        $fabricOptions = $site ? $this->stockItemOptions($site->id, true) : collect();
+        $items = $this->stockItemOptions(null, false, 'finished_good')->map(fn ($o) => (object) $o);
+        $fabricOptions = $site ? $this->stockItemOptions($site->id, true, 'raw_material') : collect();
 
         return view('admin.production.create', compact('sites', 'site', 'items', 'fabricOptions'));
     }
@@ -129,8 +129,8 @@ class ProductionOrderController extends Controller implements HasMiddleware
 
         [$product, $variant] = $this->resolveItem($validated['item']);
 
-        if (! $product) {
-            throw ValidationException::withMessages(['item' => 'Pick the item and size being produced.']);
+        if (! $product || $product->isRawMaterial()) {
+            throw ValidationException::withMessages(['item' => 'Pick the finished item and size being produced.']);
         }
 
         $site = Site::findOrFail($validated['site_id']);
@@ -184,7 +184,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
         $nextStage = collect(['sewing', 'finishing'])->first(fn ($s) => ($available[$s] ?? 0) > 0) ?? 'sewing';
 
         $materialOptions = $productionOrder->isOpen()
-            ? $this->stockItemOptions($productionOrder->site_id, true)
+            ? $this->stockItemOptions($productionOrder->site_id, true, 'raw_material')
             : collect();
 
         return view('admin.production.show', [
@@ -298,8 +298,8 @@ class ProductionOrderController extends Controller implements HasMiddleware
         foreach ($rows as $i => $row) {
             [$product, $variant] = $this->resolveItem($row['item']);
 
-            if (! $product) {
-                throw ValidationException::withMessages(["{$field}.{$i}.item" => 'Pick a valid material.']);
+            if (! $product || ! $product->isRawMaterial()) {
+                throw ValidationException::withMessages(["{$field}.{$i}.item" => 'Pick a raw material.']);
             }
 
             $balance = StockMovement::balanceFor($product->id, $variant?->id, $site->id);

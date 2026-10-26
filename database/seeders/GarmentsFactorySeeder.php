@@ -55,6 +55,7 @@ class GarmentsFactorySeeder extends Seeder
                 ['sku' => $p['sku']],
                 [
                     'name' => $p['name'],
+                    'type' => $p['category']->is($rawMaterial) ? 'raw_material' : 'finished_good',
                     'category_id' => $p['category']->id,
                     'stock_unit_id' => $p['unit']->id,
                     'purchase_unit_id' => $p['unit']->id,
@@ -78,6 +79,7 @@ class GarmentsFactorySeeder extends Seeder
                 ['sku' => 'KW-FRK-001'],
                 [
                     'name' => 'Girls Silk Frock',
+                    'type' => 'finished_good',
                     'category_id' => $kidsWear->id,
                     'stock_unit_id' => $pcs->id,
                     'purchase_unit_id' => $pcs->id,
