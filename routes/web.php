@@ -93,6 +93,7 @@ Route::prefix('admin')->group(function () {
         Route::resource('products', ProductController::class)->except('show');
         Route::patch('/products/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->name('products.toggle-status');
         Route::get('/products/barcode', [ProductController::class, 'barcode'])->name('products.barcode');
+        Route::get('/products/next-sku', [ProductController::class, 'nextSku'])->name('products.next-sku');
         Route::get('/products/{product}/history', [ProductController::class, 'history'])->name('products.history');
 
         Route::get('/stock/initial-stock', [InitialStockController::class, 'index'])->name('stock.initial.index');

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
@@ -128,27 +129,39 @@ class Product extends Model
     }
 
     /**
-     * SKU prefix per type — see nextSku().
+     * Next auto SKU for a product name: the first letter of each word (up
+     * to 3) plus a 3-digit running number for that code, e.g.
+     * "Girls Silk Frock" → GSF-001, a second "Silk Fabric" → SF-002.
+     * Generated once on create and never changed with the name, so printed
+     * labels and past records stay valid.
      */
-    public const SKU_PREFIXES = [
-        'raw_material' => 'RM',
-        'finished_good' => 'FG',
-    ];
-
-    /**
-     * Next auto SKU for a type, e.g. RM-00007 / FG-00012: one past the
-     * highest number already used under that prefix (manual SKUs that
-     * don't follow the pattern are ignored).
-     */
-    public static function nextSku(string $type): string
+    public static function nextSku(string $name): string
     {
-        $prefix = self::SKU_PREFIXES[$type] ?? 'PRD';
+        $words = preg_split('/[^A-Za-z0-9]+/', Str::ascii($name), -1, PREG_SPLIT_NO_EMPTY);
+        $code = strtoupper(implode('', array_map(fn ($w) => $w[0], array_slice($words, 0, 3)))) ?: 'P';
 
-        $max = static::where('sku', 'like', "{$prefix}-%")->pluck('sku')
-            ->map(fn ($sku) => preg_match('/^'.$prefix.'-(\d+)$/', $sku, $m) ? (int) $m[1] : 0)
+        $max = static::where('sku', 'like', "{$code}-%")->pluck('sku')
+            ->map(fn ($sku) => preg_match('/^'.$code.'-(\d+)$/', $sku, $m) ? (int) $m[1] : 0)
             ->max() ?? 0;
 
-        return sprintf('%s-%05d', $prefix, $max + 1);
+        return sprintf('%s-%03d', $code, $max + 1);
+    }
+
+    /**
+     * Auto barcode: an EAN-13 number in the "2x" in-store range — 2-digit
+     * prefix (20 = product, 21 = variant) + the row id padded to 10 digits
+     * + check digit. Unique by construction, numeric so any shop scanner or
+     * POS reads it; a real GS1 barcode can still be typed in over it.
+     */
+    public static function internalBarcode(string $prefix, int $id): string
+    {
+        $digits = $prefix.str_pad((string) $id, 10, '0', STR_PAD_LEFT);
+        $sum = 0;
+        foreach (str_split($digits) as $i => $d) {
+            $sum += (int) $d * ($i % 2 === 0 ? 1 : 3);
+        }
+
+        return $digits.((10 - $sum % 10) % 10);
     }
 
     public function getTypeLabelAttribute(): string

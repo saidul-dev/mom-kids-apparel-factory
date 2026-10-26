@@ -27,7 +27,7 @@ class ProductController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:inventory.view', only: ['index', 'barcode', 'history']),
-            new Middleware('permission:inventory.create', only: ['create', 'store']),
+            new Middleware('permission:inventory.create', only: ['create', 'store', 'nextSku']),
             new Middleware('permission:inventory.edit', only: ['edit', 'update', 'toggleStatus']),
             new Middleware('permission:inventory.delete', only: ['destroy']),
         ];
@@ -68,8 +68,11 @@ class ProductController extends Controller implements HasMiddleware
         }
 
         $product = DB::transaction(function () use ($validated, $variants) {
-            $validated['sku'] = filled($validated['sku'] ?? null) ? $validated['sku'] : Product::nextSku($validated['type']);
+            $validated['sku'] = filled($validated['sku'] ?? null) ? $validated['sku'] : Product::nextSku($validated['name']);
             $product = Product::create(collect($validated)->except(['image', 'gallery_images', 'remove_gallery_ids'])->all());
+            if (blank($product->barcode)) {
+                $product->update(['barcode' => Product::internalBarcode('20', $product->id)]);
+            }
             if ($product->has_variants) {
                 $this->syncVariants($product, $variants);
             }
@@ -99,6 +102,11 @@ class ProductController extends Controller implements HasMiddleware
         // SKU isn't editable on the form — keep the existing one.
         if (blank($validated['sku'] ?? null)) {
             unset($validated['sku']);
+        }
+
+        // Barcode left blank → auto (also fills products made before auto barcodes).
+        if (blank($validated['barcode'] ?? null)) {
+            $validated['barcode'] = $product->barcode ?: Product::internalBarcode('20', $product->id);
         }
 
         // Estimated cost is only a manual starting reference before this
@@ -138,6 +146,15 @@ class ProductController extends Controller implements HasMiddleware
         });
 
         return redirect()->route('products.index')->with('success', "Product \"{$product->name}\" updated.");
+    }
+
+    /**
+     * Live SKU preview for the product form while the name is typed — the
+     * same rule store() applies on save.
+     */
+    public function nextSku(Request $request)
+    {
+        return response()->json(['sku' => Product::nextSku((string) $request->query('name', ''))]);
     }
 
     public function toggleStatus(Product $product)
@@ -289,7 +306,7 @@ class ProductController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(array_keys(Product::TYPES))],
-            // Auto-generated from the type when left out (see Product::nextSku()).
+            // Auto-generated from the name when left out (see Product::nextSku()).
             'sku' => ['nullable', 'string', 'max:100', Rule::unique('products', 'sku')->ignore($product?->id)],
             'barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')->ignore($product?->id)],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
@@ -443,6 +460,10 @@ class ProductController extends Controller implements HasMiddleware
 
             if (blank($row['sku'] ?? null) && (empty($row['id']) || str_starts_with($variant->sku, 'PENDING-'))) {
                 $variant->update(['sku' => $this->variantSku($product, $variant->load('attributeValues'))]);
+            }
+
+            if (blank($variant->barcode)) {
+                $variant->update(['barcode' => Product::internalBarcode('21', $variant->id)]);
             }
         }
 

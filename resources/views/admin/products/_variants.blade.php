@@ -55,7 +55,7 @@
                                        class="block w-32 rounded-lg border-slate-300 text-sm focus:border-accent-500 focus:ring-accent-500">
                             </td>
                             <td class="py-2 pr-3">
-                                <input type="text" :name="'variants[' + i + '][barcode]'" x-model="variant.barcode"
+                                <input type="text" :name="'variants[' + i + '][barcode]'" x-model="variant.barcode" placeholder="{{ __('auto') }}"
                                        class="block w-32 rounded-lg border-slate-300 text-sm focus:border-accent-500 focus:ring-accent-500">
                             </td>
                             <td class="py-2 pr-3">

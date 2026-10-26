@@ -78,34 +78,56 @@
     <div class="lg:col-span-2 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-4">
         <h3 class="font-bold text-brand-900">{{ __('Details') }}</h3>
 
-        <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full"
-                          :value="old('name', $product->name ?? '')" required autofocus
-                          x-bind:placeholder="type === 'raw_material' ? '{{ __('e.g. Silk Fabric') }}' : '{{ __('e.g. Girls Frock') }}'" />
-            <x-input-error class="mt-2" :messages="$errors->get('name')" />
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {{-- SKU is never typed: it follows the name live while creating
+             (Product::nextSku(), same rule the server applies on save) and
+             never changes afterwards. Barcode is auto too unless overridden. --}}
+        <div class="space-y-4"
+             x-data="{
+                sku: '',
+                loading: false,
+                loadSku(name) {
+                    if (! name.trim()) { this.sku = ''; return; }
+                    this.loading = true;
+                    fetch(@js(route('products.next-sku')) + '?name=' + encodeURIComponent(name), { headers: { Accept: 'application/json' } })
+                        .then((r) => r.json())
+                        .then((d) => { this.sku = d.sku; })
+                        .finally(() => { this.loading = false; });
+                },
+             }"
+             @if (! $editing) x-init="loadSku($refs.name.value)" @endif>
             <div>
-                <x-input-label :value="__('Code / SKU')" />
-                {{-- Never typed: generated from the type on create (Product::nextSku()). --}}
-                @if ($editing)
-                <div class="mt-1 flex h-[42px] items-center rounded-lg bg-slate-50 px-3 font-mono text-sm font-semibold text-slate-700 ring-1 ring-slate-200">{{ $product->sku }}</div>
-                @else
-                <div class="mt-1 flex h-[42px] items-center justify-between rounded-lg bg-slate-50 px-3 ring-1 ring-slate-200">
-                    <span class="font-mono text-sm font-semibold text-slate-700"
-                          x-text="type === 'raw_material' ? @js(\App\Models\Product::nextSku('raw_material')) : @js(\App\Models\Product::nextSku('finished_good'))"></span>
-                    <span class="text-[11px] font-medium text-slate-400">{{ __('auto') }}</span>
-                </div>
-                @endif
-                <x-input-error class="mt-2" :messages="$errors->get('sku')" />
+                <x-input-label for="name" :value="__('Name')" />
+                <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" x-ref="name"
+                              :value="old('name', $product->name ?? '')" required autofocus
+                              x-on:input.debounce.300ms="{{ $editing ? '' : 'loadSku($event.target.value)' }}"
+                              x-bind:placeholder="type === 'raw_material' ? '{{ __('e.g. Silk Fabric') }}' : '{{ __('e.g. Girls Silk Frock') }}'" />
+                <x-input-error class="mt-2" :messages="$errors->get('name')" />
             </div>
-            <div x-show="type === 'finished_good'" x-cloak>
-                <x-input-label for="barcode" :value="__('Barcode (optional)')" />
-                <x-text-input id="barcode" name="barcode" type="text" class="mt-1 block w-full"
-                              :value="old('barcode', $product->barcode ?? '')" />
-                <x-input-error class="mt-2" :messages="$errors->get('barcode')" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <x-input-label :value="__('Code / SKU')" />
+                    @if ($editing)
+                    <div class="mt-1 flex h-[42px] items-center rounded-lg bg-slate-50 px-3 font-mono text-sm font-semibold text-slate-700 ring-1 ring-slate-200">{{ $product->sku }}</div>
+                    @else
+                    <div class="mt-1 flex h-[42px] items-center justify-between rounded-lg bg-slate-50 px-3 ring-1 ring-slate-200">
+                        <span class="font-mono text-sm font-semibold text-slate-700" :class="loading && 'opacity-50'"
+                              x-text="sku || '{{ __('Type a name…') }}'"></span>
+                        <span class="text-[11px] font-medium text-slate-400">{{ __('auto') }}</span>
+                    </div>
+                    @endif
+                    <x-input-error class="mt-2" :messages="$errors->get('sku')" />
+                </div>
+                <div>
+                    <x-input-label for="barcode" :value="__('Barcode')" />
+                    <div class="relative mt-1">
+                        <x-text-input id="barcode" name="barcode" type="text" class="block w-full pr-12 font-mono"
+                                      :value="old('barcode', $product->barcode ?? '')" placeholder="{{ __('Generated on save') }}" />
+                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400">{{ __('auto') }}</span>
+                    </div>
+                    <p class="mt-1 text-[11px] text-slate-400">{{ __('Leave blank — only type one if a buyer gave you their own barcode.') }}</p>
+                    <x-input-error class="mt-2" :messages="$errors->get('barcode')" />
+                </div>
             </div>
         </div>
 

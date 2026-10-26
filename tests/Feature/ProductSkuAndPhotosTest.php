@@ -50,16 +50,36 @@ class ProductSkuAndPhotosTest extends TestCase
         ], $overrides);
     }
 
-    public function test_sku_is_generated_per_type_in_sequence(): void
+    public function test_sku_is_built_from_the_name(): void
     {
-        $this->post(route('products.store'), $this->payload())->assertSessionHasNoErrors();
+        $this->post(route('products.store'), $this->payload(['name' => 'Girls Silk Frock']))->assertSessionHasNoErrors();
         $this->post(route('products.store'), $this->payload(['name' => 'Silk Fabric', 'type' => 'raw_material']))->assertSessionHasNoErrors();
-        $this->post(route('products.store'), $this->payload(['name' => 'Baby Romper']))->assertSessionHasNoErrors();
+        $this->post(route('products.store'), $this->payload(['name' => 'Soft Fleece']))->assertSessionHasNoErrors();
+        $this->post(route('products.store'), $this->payload(['name' => 'Kids Pajama Set Winter']))->assertSessionHasNoErrors();
 
         $this->assertSame(
-            ['Girls Frock' => 'FG-00001', 'Silk Fabric' => 'RM-00001', 'Baby Romper' => 'FG-00002'],
-            Product::orderBy('id')->pluck('sku', 'name')->all()
+            ['GSF-001', 'SF-001', 'SF-002', 'KPS-001'],
+            Product::orderBy('id')->pluck('sku')->all()
         );
+    }
+
+    public function test_sku_preview_matches_what_save_will_use(): void
+    {
+        $this->post(route('products.store'), $this->payload(['name' => 'Silk Fabric', 'type' => 'raw_material']));
+
+        $this->getJson(route('products.next-sku', ['name' => 'Soft Fleece']))->assertOk()->assertJson(['sku' => 'SF-002']);
+        $this->getJson(route('products.next-sku', ['name' => 'Baby Romper']))->assertOk()->assertJson(['sku' => 'BR-001']);
+    }
+
+    public function test_barcode_is_generated_unless_one_is_given(): void
+    {
+        $this->post(route('products.store'), $this->payload())->assertSessionHasNoErrors();
+        $this->post(route('products.store'), $this->payload(['name' => 'Baby Romper', 'barcode' => '8901234567890']))->assertSessionHasNoErrors();
+
+        [$auto, $given] = Product::orderBy('id')->get()->all();
+        $this->assertSame(Product::internalBarcode('20', $auto->id), $auto->barcode);
+        $this->assertMatchesRegularExpression('/^20\d{11}$/', $auto->barcode);
+        $this->assertSame('8901234567890', $given->barcode);
     }
 
     public function test_editing_keeps_the_generated_sku(): void
@@ -70,7 +90,8 @@ class ProductSkuAndPhotosTest extends TestCase
         $this->put(route('products.update', $product), $this->payload(['name' => 'Girls Party Frock']))
             ->assertSessionHasNoErrors();
 
-        $this->assertSame('FG-00001', $product->fresh()->sku);
+        $this->assertSame('GF-001', $product->fresh()->sku);
+        $this->assertNotNull($product->fresh()->barcode);
     }
 
     public function test_size_skus_are_generated_from_the_product_sku(): void
@@ -87,7 +108,9 @@ class ProductSkuAndPhotosTest extends TestCase
             ],
         ]))->assertSessionHasNoErrors();
 
-        $this->assertSame(['FG-00001-M', 'FG-00001-L'], Product::firstOrFail()->variants()->orderBy('id')->pluck('sku')->all());
+        $variants = Product::firstOrFail()->variants()->orderBy('id')->get();
+        $this->assertSame(['GF-001-M', 'GF-001-L'], $variants->pluck('sku')->all());
+        $this->assertSame(Product::internalBarcode('21', $variants[0]->id), $variants[0]->barcode);
     }
 
     public function test_finished_goods_take_multiple_photos(): void
@@ -110,6 +133,6 @@ class ProductSkuAndPhotosTest extends TestCase
 
     public function test_product_form_renders(): void
     {
-        $this->get(route('products.create'))->assertOk()->assertSee('More Photos')->assertSee('FG-00001');
+        $this->get(route('products.create'))->assertOk()->assertSee('More Photos')->assertSee('Generated on save');
     }
 }
