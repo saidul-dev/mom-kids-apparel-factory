@@ -9,16 +9,17 @@ use Illuminate\Database\Seeder;
 class SiteSeeder extends Seeder
 {
     /**
-     * The business runs from exactly two Sites: the Factory (purchase,
-     * production, direct customer orders) and the Wholesale Point
-     * (finished goods transferred in from the Factory and sold there).
+     * The business runs from exactly two Sites: the Factory & Central
+     * Warehouse (purchase, production, finished stock, direct customer
+     * orders) and the Wholesale Outlet (finished goods transferred in from
+     * the Factory and sold there).
      */
     public function run(): void
     {
         $factory = Site::firstOrCreate(
             ['code' => 'FAC-01'],
             [
-                'name' => 'Factory',
+                'name' => 'Factory & Central Warehouse',
                 'type' => 'Factory',
                 'address' => 'Dhaka, Bangladesh',
                 'status' => true,
@@ -26,9 +27,9 @@ class SiteSeeder extends Seeder
         );
 
         $wholesale = Site::firstOrCreate(
-            ['code' => 'WP-01'],
+            ['code' => 'WO-01'],
             [
-                'name' => 'Wholesale Point',
+                'name' => 'Wholesale Outlet',
                 'type' => 'Outlet',
                 'address' => 'Dhaka, Bangladesh',
                 'status' => true,

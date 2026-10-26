@@ -168,6 +168,13 @@ class ProductionOrder extends Model
         $current['stock'] = $totals[self::FINAL_STAGE];
         unset($current[self::FINAL_STAGE]);
 
+        // A completed lot has nothing left on the floor — whatever wasn't
+        // packed was written off as wastage when it was closed.
+        if ($this->exists && ! $this->isOpen()) {
+            $current = array_map(fn () => 0, $current);
+            $current['stock'] = $totals[self::FINAL_STAGE];
+        }
+
         return $current;
     }
 
