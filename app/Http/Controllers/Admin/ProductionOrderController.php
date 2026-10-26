@@ -22,14 +22,14 @@ use Illuminate\Validation\ValidationException;
  *
  * A production (tracking no. PRD-…) is one size of one item. Creating it
  * IS the cutting step: the fabric used and the pieces it gave are
- * recorded together. Sewing and Finishing are then entered on the
+ * recorded together. Sewing, Finishing and Blister/Poly are then entered on the
  * production's page as the pieces move forward. Fabric is entered in its
  * own stock unit (e.g. 5 Roll or 500 Gaj), like any other inventory item.
  *
  * Stock/ledger side-effects:
  * - Material issued with any stage entry → `production_consumption` out
  *   at its average cost; Debit Work in Progress / Credit Inventory.
- * - Finishing → `production` in of the finished item, costed at the lot's
+ * - Blister/Poly → `production` in of the finished item, costed at the lot's
  *   WIP value ÷ pieces still in WIP; Debit Inventory / Credit WIP.
  * - Complete → any WIP left (pieces cut but never finished) is written
  *   off; Debit Production Wastage / Credit WIP.
@@ -47,16 +47,21 @@ class ProductionOrderController extends Controller implements HasMiddleware
         ];
     }
 
+    /**
+     * Production dashboard: where every piece is right now across running
+     * productions, plus the list of productions (running by default) with
+     * each one's current position per stage, and the latest activity.
+     */
     public function index(Request $request)
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
         $siteId = $request->filled('site_id') ? $request->integer('site_id') : null;
-        $status = $request->get('status');
+        $status = $request->get('status', 'in_progress');
         $search = trim((string) $request->get('q'));
 
         $orders = ProductionOrder::with(['site', 'product.stockUnit', 'productVariant.attributeValues'])
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->when($status, fn ($q) => $q->where('status', $status))
+            ->when(in_array($status, ProductionOrder::STATUSES, true), fn ($q) => $q->where('status', $status))
             ->when($search !== '', fn ($q) => $q->where(function ($q) use ($search) {
                 $q->where('production_no', 'like', "%{$search}%")
                     ->orWhereHas('product', fn ($q) => $q->where('name', 'like', "%{$search}%"));
@@ -67,29 +72,52 @@ class ProductionOrderController extends Controller implements HasMiddleware
             ->withQueryString();
 
         // One grouped query for the whole page instead of stageTotals() per row.
-        $totals = DB::table('production_stage_entries')
+        $stageSums = DB::table('production_stage_entries')
             ->whereIn('production_order_id', $orders->pluck('id'))
             ->selectRaw('production_order_id, stage, SUM(quantity) as total')
             ->groupBy('production_order_id', 'stage')
             ->get()
-            ->groupBy('production_order_id')
-            ->map(fn ($rows) => $rows->pluck('total', 'stage')->map(fn ($v) => (float) $v));
+            ->groupBy('production_order_id');
 
-        $summary = [
-            'running' => ProductionOrder::where('status', 'in_progress')->count(),
-            'waitingSewing' => 0,
-            'waitingFinishing' => 0,
-        ];
+        $positions = $orders->getCollection()->mapWithKeys(function (ProductionOrder $order) use ($stageSums) {
+            $sums = ($stageSums[$order->id] ?? collect())->pluck('total', 'stage');
+            $totals = collect(ProductionOrder::STAGES)->map(fn ($l, $stage) => (float) ($sums[$stage] ?? 0))->all();
+
+            return [$order->id => ['totals' => $totals, 'current' => $order->currentlyAt($totals)]];
+        });
+
+        // Floor-wide picture across every running production. Each lot's
+        // stage totals only ever shrink stage to stage, so summing them
+        // before subtracting gives the same answer as per-lot math.
         $open = DB::table('production_stage_entries')
             ->join('production_orders', 'production_orders.id', '=', 'production_stage_entries.production_order_id')
             ->where('production_orders.status', 'in_progress')
+            ->when($siteId, fn ($q) => $q->where('production_orders.site_id', $siteId))
             ->selectRaw('stage, SUM(quantity) as total')
             ->groupBy('stage')
             ->pluck('total', 'stage');
-        $summary['waitingSewing'] = max((float) ($open['cutting'] ?? 0) - (float) ($open['sewing'] ?? 0), 0);
-        $summary['waitingFinishing'] = max((float) ($open['sewing'] ?? 0) - (float) ($open['finishing'] ?? 0), 0);
+        $openTotals = collect(ProductionOrder::STAGES)->map(fn ($l, $stage) => (float) ($open[$stage] ?? 0))->all();
+        $floor = (new ProductionOrder)->currentlyAt($openTotals);
 
-        return view('admin.production.index', compact('orders', 'sites', 'siteId', 'status', 'search', 'totals', 'summary'));
+        $packedQuery = fn () => DB::table('production_stage_entries')
+            ->join('production_orders', 'production_orders.id', '=', 'production_stage_entries.production_order_id')
+            ->where('stage', ProductionOrder::FINAL_STAGE)
+            ->when($siteId, fn ($q) => $q->where('production_orders.site_id', $siteId));
+
+        $summary = [
+            'running' => ProductionOrder::where('status', 'in_progress')->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count(),
+            'floor' => $floor,
+            'packedToday' => (float) $packedQuery()->whereDate('entry_date', today())->sum('quantity'),
+            'packedMonth' => (float) $packedQuery()->whereBetween('entry_date', [now()->startOfMonth()->toDateString(), now()->toDateString()])->sum('quantity'),
+        ];
+
+        $activity = ProductionStageEntry::with(['productionOrder.product', 'productionOrder.productVariant.attributeValues', 'createdBy'])
+            ->when($siteId, fn ($q) => $q->whereHas('productionOrder', fn ($q) => $q->where('site_id', $siteId)))
+            ->latest('id')
+            ->limit(8)
+            ->get();
+
+        return view('admin.production.index', compact('orders', 'sites', 'siteId', 'status', 'search', 'positions', 'summary', 'activity'));
     }
 
     /**
@@ -180,9 +208,6 @@ class ProductionOrderController extends Controller implements HasMiddleware
         $accessories = $materials->where('stage', '!=', 'cutting')->values();
         $materialCost = round($materials->sum(fn ($m) => (float) $m->quantity * (float) $m->unit_cost), 2);
 
-        // Next stage with pieces waiting is what the entry form opens on.
-        $nextStage = collect(['sewing', 'finishing'])->first(fn ($s) => ($available[$s] ?? 0) > 0) ?? 'sewing';
-
         $materialOptions = $productionOrder->isOpen()
             ? $this->stockItemOptions($productionOrder->site_id, true, 'raw_material')
             : collect();
@@ -191,18 +216,18 @@ class ProductionOrderController extends Controller implements HasMiddleware
             'order' => $productionOrder,
             'totals' => $totals,
             'available' => $available,
+            'current' => $productionOrder->currentlyAt($totals),
             'inProcess' => $productionOrder->piecesInProcess($totals),
             'wipValue' => $productionOrder->wipValue(),
             'fabrics' => $fabrics,
             'accessories' => $accessories,
             'materialCost' => $materialCost,
-            'nextStage' => $nextStage,
             'materialOptions' => $materialOptions,
         ]);
     }
 
     /**
-     * Record pieces moving through a stage — usually Sewing or Finishing
+     * Record pieces moving through a stage — Sewing, Finishing or Blister/Poly
      * (Cutting is recorded when the production is created, but more can
      * be cut later if extra fabric is issued). Material such as thread or
      * poly bags can be issued at the same time.
@@ -323,7 +348,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
 
     /**
      * One stage entry plus its material issue, and finished goods when the
-     * stage is Finishing. Callers wrap this in a transaction.
+     * stage is Blister/Poly. Callers wrap this in a transaction.
      */
     protected function recordStage(ProductionOrder $order, string $stage, float $quantity, string $date, ?string $note, array $materials): ProductionStageEntry
     {
@@ -378,7 +403,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
             ]);
         }
 
-        if ($stage === 'finishing') {
+        if ($stage === ProductionOrder::FINAL_STAGE) {
             $this->postFinishedGoods($order, $entry, $quantity, $date);
         }
 
@@ -386,7 +411,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
     }
 
     /**
-     * Finishing hands pieces to finished-goods stock at the lot's Site.
+     * Blister/Poly hands pieces to finished-goods stock at the lot's Site.
      * Each finished piece carries an equal share of the WIP still on the
      * lot (WIP value ÷ pieces cut but not yet finished), so the lot's
      * total cost ends up spread over everything it actually produced.

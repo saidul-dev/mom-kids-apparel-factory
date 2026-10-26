@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * A production lot for one finished garment (product or variant) at one
- * Site. Pieces flow Cutting → Sewing → Finishing; each stage can only
- * take what the previous stage has handed over and not yet passed on,
- * e.g. 200 cut → 100 sewn → 50 finished leaves 100 waiting for sewing
- * and 50 waiting for finishing. Only Finishing puts goods into stock.
+ * Site. Pieces flow Cutting → Sewing → Finishing (iron) → Blister/Poly;
+ * each stage can only take what the previous stage has handed over and
+ * not yet passed on, e.g. 500 cut → 300 sewn → 200 ironed → 150 packed
+ * leaves 200 at cutting, 100 at sewing and 50 at finishing. Only
+ * Blister/Poly puts goods into finished stock.
  * See docs/garments-production.md.
  */
 class ProductionOrder extends Model
@@ -25,8 +26,14 @@ class ProductionOrder extends Model
     public const STAGES = [
         'cutting' => 'Cutting',
         'sewing' => 'Sewing',
-        'finishing' => 'Finishing (Iron & Poly)',
+        'finishing' => 'Finishing (Iron)',
+        'packing' => 'Blister / Poly',
     ];
+
+    /**
+     * The stage whose output goes into finished-goods stock.
+     */
+    public const FINAL_STAGE = 'packing';
 
     protected $fillable = [
         'production_no',
@@ -134,24 +141,45 @@ class ProductionOrder extends Model
     }
 
     /**
-     * Pieces cut but not yet finished — everything still on the floor.
+     * Pieces cut but not yet packed into finished stock — everything still
+     * on the floor.
      */
     public function piecesInProcess(?array $totals = null): float
     {
         $totals ??= $this->stageTotals();
 
-        return max($totals['cutting'] - $totals['finishing'], 0);
+        return max($totals['cutting'] - $totals[self::FINAL_STAGE], 0);
+    }
+
+    /**
+     * Where the pieces are right now: done at a stage but not yet taken by
+     * the next one. 'stock' is what has been packed into finished goods.
+     */
+    public function currentlyAt(?array $totals = null): array
+    {
+        $totals ??= $this->stageTotals();
+        $stages = array_keys(self::STAGES);
+        $current = [];
+
+        foreach ($stages as $i => $stage) {
+            $next = $stages[$i + 1] ?? null;
+            $current[$stage] = $next ? max($totals[$stage] - $totals[$next], 0) : 0;
+        }
+        $current['stock'] = $totals[self::FINAL_STAGE];
+        unset($current[self::FINAL_STAGE]);
+
+        return $current;
     }
 
     /**
      * Cost sitting in Work-in-Progress for this lot: every material issued
-     * to it, less what Finishing has already moved into finished stock and
-     * whatever was written off on close.
+     * to it, less what Blister/Poly has already moved into finished stock
+     * and whatever was written off on close.
      */
     public function wipValue(): float
     {
         $issued = (float) $this->materials()->selectRaw('COALESCE(SUM(quantity * unit_cost), 0) as v')->value('v');
-        $finished = (float) $this->stageEntries()->where('stage', 'finishing')
+        $finished = (float) $this->stageEntries()->where('stage', self::FINAL_STAGE)
             ->selectRaw('COALESCE(SUM(quantity * unit_cost), 0) as v')->value('v');
 
         return round(max($issued - $finished - (float) $this->wastage_value, 0), 2);

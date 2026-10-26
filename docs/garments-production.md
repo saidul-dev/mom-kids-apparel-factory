@@ -9,7 +9,7 @@ ledger ([stock-movements.md](stock-movements.md)) and `LedgerService`
 Purchase fabric ──► Factory stock
                        │  (issued as material)
                        ▼
-   Production lot: Cutting ──► Sewing ──► Finishing (iron + poly)
+   Production: Cutting ──► Sewing ──► Finishing (iron) ──► Blister / Poly
                                               │
                                               ▼
                                   Finished stock at Factory
@@ -39,7 +39,17 @@ On save (no draft step):
 
 The supplier is paid later from Accounts → Payments.
 
-## 2. Production lot (built)
+## 0. Product types
+
+Every product is either **Raw Material** (fabric, thread, poly bags…) or
+**Finished Goods** (`products.type`, `Product::TYPES`). There is no BOM —
+production starts from whatever fabric is issued to it. Production only
+offers raw materials as fabric/material and finished goods as the item
+made; Sales Orders only offer finished goods; Purchase offers both. The
+product form is trimmed to what the factory uses (type, name, code,
+category, unit, cost, price, low-stock alert, sizes).
+
+## 2. Production (built)
 
 Route `admin/production-orders*` (`production-orders.*`),
 `ProductionOrderController`. Tables: `production_orders`,
@@ -62,24 +72,30 @@ After that, progress is recorded as stage entries on the production page:
 |---|---|---|
 | Cutting | — (recorded on create; "Extra Cutting" if more fabric is issued later) | anything |
 | Sewing | Cutting | cut − sewn |
-| Finishing (iron & poly) | Sewing | sewn − finished |
+| Finishing (iron) | Sewing | sewn − ironed |
+| Blister / Poly | Finishing | ironed − packed |
 
-Example: **500** cut → **300** sewn → **200** finished. The production
-page shows a stage tracker (Cutting → Sewing → Finishing → Finished
-Stock), a bar of where the 500 pcs are now (200 finished, 100 waiting for
-finishing, 200 waiting for sewing), the fabric used and a timeline of
-every entry.
+Example: **500** cut → **300** sewn → **200** ironed → **150** blistered.
+Right now that is 200 pcs at cutting, 100 at sewing, 50 at finishing and
+150 in finished stock (`ProductionOrder::currentlyAt()`).
+
+**Production Dashboard** (`production-orders.index`): pieces at each
+stage right now across all running productions, finished today / this
+month, every production with its current position per stage, and the
+latest activity. **Production page**: tracking no., item & size, the
+four stage cards (now here / total through), material used, cost, one
+quick-entry card per stage (with an "All" button) and the history.
 
 **Materials.** Fabric is issued on create; any later stage entry can
 also issue material from the Site (thread at sewing, poly bags at
-finishing). Each
+blister). Each
 line posts a `production_consumption` out movement at the item's current
 average cost (balance-checked, never negative) and the entry's total goes
 **Dr Work in Progress / Cr Inventory** (voucher `PRD-…`).
 
-**Finishing** is the only stage that touches finished stock: it posts a
+**Blister / Poly** is the only stage that touches finished stock: it posts a
 `production` in movement of the lot's item at the Site. Cost per piece =
-the lot's WIP value ÷ pieces still in WIP (cut but not yet finished), so
+the lot's WIP value ÷ pieces still in WIP (cut but not yet packed), so
 the cost of every material issued is spread over the pieces actually
 produced; the last pieces out take whatever WIP is left so rounding never
 strands a balance. Ledger: **Dr Inventory / Cr Work in Progress**.
