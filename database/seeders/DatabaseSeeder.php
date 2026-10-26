@@ -21,10 +21,10 @@ class DatabaseSeeder extends Seeder
         $this->call(LeaveTypeSeeder::class);
         $this->call(LedgerAccountSeeder::class);
         $this->call(UnitSeeder::class);
-        $this->call(CategorySeeder::class);
-        $this->call(BrandSeeder::class);
+        // Categories and products come from GarmentsFactorySeeder (below) —
+        // CategorySeeder/BrandSeeder/ProductSeeder hold the generic retail
+        // storefront demo (electronics, groceries…) and aren't called.
         $this->call(AttributeSeeder::class);
-        $this->call(ProductSeeder::class);
         $this->call(PartySeeder::class);
         $this->call(HeroImageSeeder::class);
         $this->call(CompanyProfileSeeder::class);

@@ -22,16 +22,14 @@ class CompanyProfileSeeder extends Seeder
         }
 
         $company->update([
-            'about_text' => 'We are a growing retail business serving customers across Bangladesh with '
-                .'quality electronics, groceries, fashion, and home essentials — both in-store and online. '
-                .'From a single head office to a network of warehouses and shops, we focus on reliable stock, '
-                .'fair pricing, and fast delivery.',
-            'mission_text' => 'To make everyday shopping simple and dependable by offering the right products, '
-                .'at the right price, always in stock — whether a customer walks into our shop or orders from '
-                .'our website.',
-            'vision_text' => 'To become the most trusted retail and e-commerce brand in Bangladesh, known for '
-                .'quality, transparency, and putting customers first in every transaction.',
-            'values_text' => 'Integrity, Customer First, Quality Assurance, Continuous Improvement',
+            'about_text' => 'Mom & Kids Apparel makes comfortable, good-quality clothing for babies, kids and '
+                .'mothers. Every piece is cut, sewn and finished in our own factory in Bangladesh, and sold '
+                .'directly from the factory and through our wholesale point.',
+            'mission_text' => 'To dress every child and mother in clothes that are soft, safe and well made — '
+                .'at a fair price, delivered on time to every retailer and customer we serve.',
+            'vision_text' => 'To be the most trusted mom & kids garments maker in Bangladesh, known for quality '
+                .'fabric, careful finishing and honest wholesale prices.',
+            'values_text' => 'Quality Fabric, Child Safety, Fair Price, On-time Delivery',
         ]);
     }
 }

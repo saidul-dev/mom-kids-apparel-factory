@@ -15,8 +15,9 @@ class AttributeSeeder extends Seeder
     public function run(): void
     {
         $attributes = [
-            'Color' => ['Black', 'White', 'Red', 'Blue', 'Green', 'Gray'],
-            'Size' => ['S', 'M', 'L', 'XL', 'XXL'],
+            'Color' => ['White', 'Pink', 'Sky Blue', 'Yellow', 'Peach', 'Navy', 'Black', 'Red'],
+            // Baby (months) and kids (years) sizes first, then mom wear.
+            'Size' => ['0-3M', '3-6M', '6-12M', '1-2Y', '2-3Y', '3-4Y', '4-5Y', '5-6Y', '7-8Y', 'S', 'M', 'L', 'XL', 'XXL'],
         ];
 
         foreach ($attributes as $name => $values) {

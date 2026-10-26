@@ -39,7 +39,7 @@ class SalesOrderTest extends TestCase
         $this->admin->assignRole('Admin');
         $this->actingAs($this->admin);
 
-        $this->outlet = Site::create(['name' => 'Wholesale Outlet', 'code' => 'OUT-01', 'type' => 'Outlet', 'status' => true]);
+        $this->outlet = Site::create(['name' => 'Wholesale Point', 'code' => 'WP-01', 'type' => 'Outlet', 'status' => true]);
         $this->customer = Party::create(['name' => 'Rahim Traders', 'phone' => '01700000003', 'is_customer' => true, 'status' => true]);
 
         $category = Category::create(['name' => 'Garments']);

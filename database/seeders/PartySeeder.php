@@ -25,7 +25,7 @@ class PartySeeder extends Seeder
         Party::firstOrCreate(
             ['phone' => '01700000002'],
             [
-                'name' => 'Default Supplier',
+                'name' => 'Fabric Supplier',
                 'is_customer' => false,
                 'is_supplier' => true,
                 'status' => true,

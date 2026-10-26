@@ -7,114 +7,117 @@ use App\Models\AttributeValue;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\Site;
 use App\Models\Unit;
-use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class GarmentsFactorySeeder extends Seeder
 {
     /**
-     * Demo setup for the garments flow (docs/garments-production.md): the
-     * Factory and the wholesale Outlet as Sites, raw material to purchase
-     * and issue to production, and finished kids-wear items to produce.
+     * Demo catalogue for Mom & Kids Apparel (docs/garments-production.md):
+     * raw material to purchase and issue to production, and finished
+     * baby/kids/mom wear in sizes to produce and sell. SKU and barcode
+     * follow the same auto rules as the product form. The two Sites come
+     * from SiteSeeder.
      */
     public function run(): void
     {
-        $factory = Site::firstOrCreate(
-            ['code' => 'FAC-01'],
-            ['name' => 'Factory', 'type' => 'Factory', 'address' => 'Dhaka, Bangladesh', 'status' => true]
-        );
-
-        $outlet = Site::firstOrCreate(
-            ['code' => 'OUT-01'],
-            ['name' => 'Wholesale Outlet', 'type' => 'Outlet', 'address' => 'Dhaka, Bangladesh', 'status' => true]
-        );
-
         // Fabric is stocked in whatever unit it's bought in — Roll or Gaj
         // (yard) — and production issues it in that same unit.
-        $roll = Unit::firstOrCreate(['short_name' => 'Roll'], ['name' => 'Roll']);
-        $gaj = Unit::firstOrCreate(['short_name' => 'Gaj'], ['name' => 'Gaj (Yard)']);
-        $pcs = Unit::firstOrCreate(['short_name' => 'Pcs'], ['name' => 'Piece']);
-
-        $rawMaterial = Category::firstOrCreate(['name' => 'Raw Material']);
-        $kidsWear = Category::firstOrCreate(['name' => 'Kids Wear']);
-
-        $products = [
-            ['sku' => 'RM-FAB-001', 'name' => 'Silk Fabric', 'category' => $rawMaterial, 'unit' => $roll, 'price' => 0],
-            ['sku' => 'RM-FAB-002', 'name' => 'Cotton Fabric', 'category' => $rawMaterial, 'unit' => $gaj, 'price' => 0],
-            ['sku' => 'RM-THR-001', 'name' => 'Sewing Thread (Cone)', 'category' => $rawMaterial, 'unit' => $pcs, 'price' => 0],
-            ['sku' => 'RM-POL-001', 'name' => 'Poly Bag', 'category' => $rawMaterial, 'unit' => $pcs, 'price' => 0],
-            ['sku' => 'KW-TS-001', 'name' => 'Kids Round Neck T-Shirt', 'category' => $kidsWear, 'unit' => $pcs, 'price' => 250],
-            ['sku' => 'KW-RMP-001', 'name' => 'Baby Romper', 'category' => $kidsWear, 'unit' => $pcs, 'price' => 380],
-            ['sku' => 'KW-PJ-001', 'name' => 'Kids Pajama Set', 'category' => $kidsWear, 'unit' => $pcs, 'price' => 450],
+        $units = [
+            'Roll' => Unit::firstOrCreate(['short_name' => 'Roll'], ['name' => 'Roll']),
+            'Gaj' => Unit::firstOrCreate(['short_name' => 'Gaj'], ['name' => 'Gaj (Yard)']),
+            'Pcs' => Unit::firstOrCreate(['short_name' => 'Pcs'], ['name' => 'Piece']),
         ];
 
-        foreach ($products as $p) {
-            Product::firstOrCreate(
-                ['sku' => $p['sku']],
-                [
-                    'name' => $p['name'],
-                    'type' => $p['category']->is($rawMaterial) ? 'raw_material' : 'finished_good',
-                    'category_id' => $p['category']->id,
-                    'stock_unit_id' => $p['unit']->id,
-                    'purchase_unit_id' => $p['unit']->id,
-                    'purchase_unit_conversion' => 1,
-                    'sale_unit_id' => $p['unit']->id,
-                    'sale_unit_conversion' => 1,
-                    'estimated_cost' => 0,
-                    'selling_price' => $p['price'],
-                    'reorder_level' => 0,
-                    'status' => true,
-                ]
-            );
+        $categories = collect(['Raw Material', 'Baby Wear', 'Kids Wear', 'Mom Wear'])
+            ->mapWithKeys(fn ($name) => [$name => Category::firstOrCreate(['name' => $name])]);
+
+        $rawMaterials = [
+            ['name' => 'Silk Fabric', 'unit' => 'Roll', 'reorder' => 5],
+            ['name' => 'Cotton Fabric', 'unit' => 'Gaj', 'reorder' => 200],
+            ['name' => 'Rib Fabric', 'unit' => 'Gaj', 'reorder' => 100],
+            ['name' => 'Sewing Thread', 'unit' => 'Pcs', 'reorder' => 50],
+            ['name' => 'Button', 'unit' => 'Pcs', 'reorder' => 500],
+            ['name' => 'Elastic', 'unit' => 'Gaj', 'reorder' => 100],
+            ['name' => 'Poly Bag', 'unit' => 'Pcs', 'reorder' => 500],
+        ];
+
+        foreach ($rawMaterials as $item) {
+            $this->product($item['name'], 'raw_material', $categories['Raw Material'], $units[$item['unit']], 0, $item['reorder']);
         }
 
-        // Sized item: every size is produced under its own tracking no.
+        $babySizes = ['0-3M', '3-6M', '6-12M'];
+        $kidsSizes = ['1-2Y', '2-3Y', '3-4Y', '4-5Y', '5-6Y', '7-8Y'];
+        $momSizes = ['S', 'M', 'L', 'XL', 'XXL'];
+
+        $finishedGoods = [
+            ['name' => 'Baby Romper', 'category' => 'Baby Wear', 'price' => 380, 'sizes' => $babySizes],
+            ['name' => 'Baby Jhabla Set', 'category' => 'Baby Wear', 'price' => 320, 'sizes' => $babySizes],
+            ['name' => 'Girls Silk Frock', 'category' => 'Kids Wear', 'price' => 650, 'sizes' => $kidsSizes],
+            ['name' => 'Kids Round Neck T-Shirt', 'category' => 'Kids Wear', 'price' => 250, 'sizes' => $kidsSizes],
+            ['name' => 'Kids Pajama Set', 'category' => 'Kids Wear', 'price' => 450, 'sizes' => $kidsSizes],
+            ['name' => 'Maternity Gown', 'category' => 'Mom Wear', 'price' => 950, 'sizes' => $momSizes],
+            ['name' => 'Nursing Top', 'category' => 'Mom Wear', 'price' => 650, 'sizes' => $momSizes],
+        ];
+
         $sizeAttributeId = Attribute::where('name', 'Size')->value('id');
         $sizeValueIds = AttributeValue::where('attribute_id', $sizeAttributeId)->pluck('id', 'value');
 
-        if ($sizeAttributeId) {
-            $frock = Product::firstOrCreate(
-                ['sku' => 'KW-FRK-001'],
-                [
-                    'name' => 'Girls Silk Frock',
-                    'type' => 'finished_good',
-                    'category_id' => $kidsWear->id,
-                    'stock_unit_id' => $pcs->id,
-                    'purchase_unit_id' => $pcs->id,
-                    'purchase_unit_conversion' => 1,
-                    'sale_unit_id' => $pcs->id,
-                    'sale_unit_conversion' => 1,
-                    'estimated_cost' => 0,
-                    'selling_price' => 650,
-                    'reorder_level' => 0,
-                    'status' => true,
-                    'has_variants' => true,
-                ]
-            );
+        foreach ($finishedGoods as $item) {
+            $product = $this->product($item['name'], 'finished_good', $categories[$item['category']], $units['Pcs'], $item['price'], 0, (bool) $sizeAttributeId);
 
-            foreach (['S', 'M', 'L', 'XL'] as $size) {
+            if (! $sizeAttributeId) {
+                continue;
+            }
+
+            foreach ($item['sizes'] as $size) {
                 if (! isset($sizeValueIds[$size])) {
                     continue;
                 }
 
                 $variant = ProductVariant::firstOrCreate(
-                    ['sku' => "KW-FRK-001-{$size}"],
-                    ['product_id' => $frock->id, 'selling_price' => 650, 'estimated_cost' => 0, 'status' => true]
+                    ['sku' => "{$product->sku}-".strtoupper($size)],
+                    ['product_id' => $product->id, 'selling_price' => $item['price'], 'estimated_cost' => 0, 'status' => true]
                 );
+                if (! $variant->barcode) {
+                    $variant->update(['barcode' => Product::internalBarcode('21', $variant->id)]);
+                }
 
                 $variant->attributeValues()->syncWithoutDetaching([
                     $sizeValueIds[$size] => ['attribute_id' => $sizeAttributeId],
                 ]);
             }
         }
+    }
 
-        $manager = User::where('email', 'manager@businesserp.test')->first();
+    /**
+     * Idempotent by name, so re-running the seeder never duplicates.
+     */
+    protected function product(string $name, string $type, Category $category, Unit $unit, float $price, int $reorder, bool $hasVariants = false): Product
+    {
+        $product = Product::firstOrCreate(
+            ['name' => $name],
+            [
+                'type' => $type,
+                'sku' => Product::nextSku($name),
+                'category_id' => $category->id,
+                'stock_unit_id' => $unit->id,
+                'purchase_unit_id' => $unit->id,
+                'purchase_unit_conversion' => 1,
+                'sale_unit_id' => $unit->id,
+                'sale_unit_conversion' => 1,
+                'estimated_cost' => 0,
+                'selling_price' => $price,
+                'reorder_level' => $reorder,
+                'status' => true,
+                'has_variants' => $hasVariants,
+            ]
+        );
 
-        $manager?->sites()->syncWithoutDetaching([
-            $factory->id => ['is_default' => false],
-            $outlet->id => ['is_default' => false],
-        ]);
+        if (! $product->barcode) {
+            $product->update(['barcode' => Product::internalBarcode('20', $product->id)]);
+        }
+
+        return $product;
     }
 }
