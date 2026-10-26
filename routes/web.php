@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\LedgerAccountController;
 use App\Http\Controllers\Admin\MilestoneController;
 use App\Http\Controllers\Admin\PartyController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\ProductionOrderController;
 use App\Http\Controllers\Admin\PayrollRunController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProfitLossController;
@@ -110,6 +111,12 @@ Route::prefix('admin')->group(function () {
 
         // Fabric / raw material purchases — see docs/garments-production.md.
         Route::resource('purchases', PurchaseController::class)->only(['index', 'create', 'store', 'show']);
+
+        // Garments production lots: Cutting -> Sewing -> Finishing -> finished stock.
+        Route::resource('production-orders', ProductionOrderController::class)->only(['index', 'create', 'store', 'show'])
+            ->parameters(['production-orders' => 'productionOrder']);
+        Route::post('/production-orders/{productionOrder}/stages', [ProductionOrderController::class, 'storeStage'])->name('production-orders.stages.store');
+        Route::post('/production-orders/{productionOrder}/complete', [ProductionOrderController::class, 'complete'])->name('production-orders.complete');
 
         Route::resource('parties', PartyController::class)->except('show');
         Route::patch('/parties/{party}/toggle-status', [PartyController::class, 'toggleStatus'])->name('parties.toggle-status');

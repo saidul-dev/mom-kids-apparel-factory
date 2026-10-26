@@ -17,6 +17,9 @@ class LedgerAccountSeeder extends Seeder
             ['code' => 'accounts_receivable', 'name' => 'Accounts Receivable', 'group' => 'party', 'nature' => 'debit'],
             ['code' => 'accounts_payable', 'name' => 'Accounts Payable', 'group' => 'party', 'nature' => 'credit'],
             ['code' => 'inventory', 'name' => 'Inventory', 'group' => 'inventory', 'nature' => 'debit'],
+            // Value of raw material issued to production lots that haven't
+            // reached Finishing yet — see ProductionOrderController.
+            ['code' => 'work_in_progress', 'name' => 'Work in Progress', 'group' => 'inventory', 'nature' => 'debit'],
             ['code' => 'purchase_expense', 'name' => 'Purchase Expense', 'group' => 'income_expense', 'nature' => 'debit'],
             ['code' => 'sales_revenue', 'name' => 'Sales Revenue', 'group' => 'income_expense', 'nature' => 'credit'],
             ['code' => 'cost_of_goods_sold', 'name' => 'Cost of Goods Sold', 'group' => 'income_expense', 'nature' => 'debit'],
@@ -37,6 +40,11 @@ class LedgerAccountSeeder extends Seeder
             // cost_of_goods_sold (sale-specific) and office_expense (not
             // tied to inventory) so P&L reports this cost on its own line.
             ['code' => 'internal_consumption_expense', 'name' => 'Internal Consumption Expense', 'group' => 'income_expense', 'nature' => 'debit'],
+
+            // WIP written off when a production lot is closed with pieces
+            // still unfinished (cutting waste, rejects) — see
+            // ProductionOrderController::complete().
+            ['code' => 'production_wastage_expense', 'name' => 'Production Wastage', 'group' => 'income_expense', 'nature' => 'debit'],
 
             // Courier fee, deducted from a COD remittance — see
             // CourierConsignmentController::settleCod().
