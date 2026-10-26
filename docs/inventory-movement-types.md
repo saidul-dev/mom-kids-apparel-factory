@@ -31,7 +31,9 @@ ledger entry at the destination.
 
 ## Open questions for implementation
 
-- Should Production consumption/output be modeled as two linked movements
-  (raw material OUT + finished goods IN) under one production transaction?
+- ~~Should Production consumption/output be modeled as two linked movements
+  (raw material OUT + finished goods IN) under one production transaction?~~
+  Yes — both reference the owning `ProductionOrder` lot; see
+  [garments-production.md](garments-production.md).
 - Batch/serial/expiry tracking (`track_batch`, `track_expiry`, `track_serial`
   on Product) — do movement records need to carry batch/serial/expiry data?

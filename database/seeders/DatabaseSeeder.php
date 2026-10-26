@@ -55,5 +55,6 @@ class DatabaseSeeder extends Seeder
         )->syncRoles('Accountant');
 
         $this->call(SiteSeeder::class);
+        $this->call(GarmentsFactorySeeder::class);
     }
 }
