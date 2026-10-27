@@ -52,7 +52,9 @@ use Illuminate\Support\Facades\Route;
 // Public company website — About, Media, Career, Contact. Every vertical
 // built on this base (property/hospital/resort/agency/restaurant, etc.)
 // gets a public-facing company site out of the box.
-Route::get('/', [WebsiteController::class, 'home'])->name('home');
+// The bare domain lands on the panel; the company website home lives at /home.
+Route::get('/', fn () => redirect()->route(auth()->check() ? 'dashboard' : 'login'));
+Route::get('/home', [WebsiteController::class, 'home'])->name('home');
 Route::get('/about', [WebsiteController::class, 'about'])->name('about');
 Route::get('/media', [WebsiteController::class, 'media'])->name('media');
 Route::get('/career', [WebsiteController::class, 'career'])->name('career');
