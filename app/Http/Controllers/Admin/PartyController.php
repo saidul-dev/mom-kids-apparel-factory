@@ -16,7 +16,7 @@ class PartyController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:parties.view', only: ['index', 'ledger']),
-            new Middleware('permission:parties.create', only: ['create', 'store']),
+            new Middleware('permission:parties.create', only: ['create', 'store', 'quickStore']),
             new Middleware('permission:parties.edit', only: ['edit', 'update', 'toggleStatus']),
             new Middleware('permission:parties.delete', only: ['destroy']),
         ];
@@ -56,6 +56,39 @@ class PartyController extends Controller implements HasMiddleware
         $party = Party::create($validated);
 
         return redirect()->route('parties.index')->with('success', "Party \"{$party->name}\" created.");
+    }
+
+    /**
+     * Quick add from a Purchase / Sales Order form without leaving it:
+     * name, phone and address only, as a Customer or a Supplier. Returns
+     * the new party for the form's picker.
+     */
+    public function quickStore(Request $request)
+    {
+        $validated = $request->validate([
+            'type' => ['required', Rule::in(['customer', 'supplier'])],
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['required', 'string', 'max:30', Rule::unique('parties', 'phone')],
+            'address' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'phone.unique' => 'A party with this phone number already exists.',
+        ]);
+
+        $party = Party::create([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'address' => $validated['address'] ?? null,
+            'is_customer' => $validated['type'] === 'customer',
+            'is_supplier' => $validated['type'] === 'supplier',
+            'is_company' => false,
+            'credit_limit' => 0,
+            'credit_days' => 0,
+            'opening_balance' => 0,
+            'opening_balance_type' => 'due',
+            'status' => true,
+        ]);
+
+        return response()->json(['id' => $party->id, 'name' => $party->name], 201);
     }
 
     public function edit(Party $party)

@@ -132,6 +132,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/sales-orders/{salesOrder}/deliver', [SalesOrderController::class, 'deliver'])->name('sales-orders.deliver');
         Route::post('/sales-orders/{salesOrder}/cancel', [SalesOrderController::class, 'cancel'])->name('sales-orders.cancel');
 
+        Route::post('/parties/quick', [PartyController::class, 'quickStore'])->name('parties.quick-store');
         Route::resource('parties', PartyController::class)->except('show');
         Route::patch('/parties/{party}/toggle-status', [PartyController::class, 'toggleStatus'])->name('parties.toggle-status');
         Route::get('/parties/{party}/ledger', [PartyController::class, 'ledger'])->name('parties.ledger');

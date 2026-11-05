@@ -32,9 +32,12 @@
                 <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 mb-4">
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                            <x-input-label for="party_id" :value="__('Supplier')" />
+                            <div class="flex items-center justify-between gap-2">
+                                <x-input-label for="party_id" :value="__('Supplier')" />
+                                <x-party-quick-add type="supplier" select="supplier-select" />
+                            </div>
                             <div class="mt-1">
-                                <x-searchable-select name="party_id" :options="$suppliers" :selected="old('party_id')"
+                                <x-searchable-select id="supplier-select" name="party_id" :options="$suppliers" :selected="old('party_id')"
                                                       placeholder="{{ __('Select a supplier…') }}" />
                             </div>
                             <x-input-error class="mt-2" :messages="$errors->get('party_id')" />
