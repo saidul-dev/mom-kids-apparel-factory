@@ -91,30 +91,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
             return [$order->id => ['totals' => $totals, 'current' => $order->currentlyAt($totals)]];
         });
 
-        // Floor-wide picture across every running production. Each lot's
-        // stage totals only ever shrink stage to stage, so summing them
-        // before subtracting gives the same answer as per-lot math.
-        $open = DB::table('production_stage_entries')
-            ->join('production_orders', 'production_orders.id', '=', 'production_stage_entries.production_order_id')
-            ->where('production_orders.status', 'in_progress')
-            ->when($siteId, fn ($q) => $q->where('production_orders.site_id', $siteId))
-            ->selectRaw('stage, SUM(quantity) as total')
-            ->groupBy('stage')
-            ->pluck('total', 'stage');
-        $openTotals = collect(ProductionOrder::STAGES)->map(fn ($l, $stage) => (float) ($open[$stage] ?? 0))->all();
-        $floor = (new ProductionOrder)->currentlyAt($openTotals);
-
-        $packedQuery = fn () => DB::table('production_stage_entries')
-            ->join('production_orders', 'production_orders.id', '=', 'production_stage_entries.production_order_id')
-            ->where('stage', ProductionOrder::FINAL_STAGE)
-            ->when($siteId, fn ($q) => $q->where('production_orders.site_id', $siteId));
-
-        $summary = [
-            'running' => ProductionOrder::where('status', 'in_progress')->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count(),
-            'floor' => $floor,
-            'packedToday' => (float) $packedQuery()->whereDate('entry_date', today())->sum('quantity'),
-            'packedMonth' => (float) $packedQuery()->whereBetween('entry_date', [now()->startOfMonth()->toDateString(), now()->toDateString()])->sum('quantity'),
-        ];
+        $summary = ProductionOrder::floorSummary($siteId);
 
         $activity = ProductionStageEntry::with(['productionOrder.product', 'productionOrder.productVariant.attributeValues', 'createdBy'])
             ->when($siteId, fn ($q) => $q->whereHas('productionOrder', fn ($q) => $q->where('site_id', $siteId)))

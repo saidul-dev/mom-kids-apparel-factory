@@ -29,6 +29,14 @@ return [
     'env' => env('APP_ENV', 'production'),
 
     /*
+    | Demo account quick-fill buttons on the login page. On locally; turn on
+    | for a demo server with APP_DEMO_LOGINS=true — never on a real install,
+    | the seeded accounts all use the password "password".
+    */
+
+    'demo_logins' => (bool) env('APP_DEMO_LOGINS', env('APP_ENV') === 'local'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Debug Mode
     |--------------------------------------------------------------------------

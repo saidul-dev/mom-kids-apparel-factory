@@ -8,6 +8,8 @@ use App\Models\Expense;
 use App\Models\LedgerAccount;
 use App\Models\Party;
 use App\Models\Product;
+use App\Models\ProductionOrder;
+use App\Models\ProductionPieceWork;
 use App\Models\StockMovement;
 use Illuminate\Support\Facades\Auth;
 
@@ -46,11 +48,35 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        $user = Auth::user();
+        $employee = $user->employee;
+
+        // Pieces only, no money: for anyone running production, and for
+        // workers so they see how the floor is doing.
+        $production = $user->can('production.view') || $employee
+            ? ProductionOrder::floorSummary($siteId)
+            : null;
+
+        // A worker's own piece work: today, this month, latest entries.
+        $myWork = null;
+        if ($employee && ($employee->salaryStructure?->mode === 'piece_rate' || $employee->pieceWorks()->exists())) {
+            $mine = fn () => ProductionPieceWork::where('employee_id', $employee->id);
+            $sum = fn ($q) => $q->selectRaw('COALESCE(SUM(quantity), 0) as pcs, COALESCE(SUM(amount), 0) as amount')->first();
+
+            $myWork = [
+                'today' => $sum($mine()->whereDate('entry_date', today())),
+                'month' => $sum($mine()->whereDate('entry_date', '>=', now()->startOfMonth())->whereDate('entry_date', '<=', today())),
+                'recent' => $mine()->with(['productionOrder.product', 'productionOrder.productVariant.attributeValues'])
+                    ->orderByDesc('entry_date')->orderByDesc('id')->limit(8)->get(),
+            ];
+        }
+
         return view('dashboard', compact(
             'todayCollection', 'todayExpense', 'totalReceivable',
             'lowStockItems', 'lowStockCount', 'criticalCount',
             'chartLabels', 'collectionSeries', 'expenseSeries',
             'topOverdueCustomers', 'recentCollections',
+            'production', 'myWork',
         ));
     }
 

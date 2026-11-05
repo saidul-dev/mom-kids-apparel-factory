@@ -19,7 +19,8 @@ class PayrollRunController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:hrm.view', only: ['index', 'show']),
+            // Everyone's pay — HR-level (edit or approve), not the self-service hrm.view an Employee login has.
+            new Middleware('permission:hrm.edit|hrm.approve', only: ['index', 'show']),
             new Middleware('permission:hrm.create', only: ['create', 'store']),
             new Middleware('permission:hrm.edit', only: ['updateItem']),
             new Middleware('permission:hrm.approve', only: ['approve']),
@@ -139,7 +140,8 @@ class PayrollRunController extends Controller implements HasMiddleware
     public function payslip(PayrollRunItem $item)
     {
         $user = Auth::user();
-        abort_unless($user->can('hrm.view') || $item->employee_id === $user->employee?->id, 403);
+        // HR-level staff see any payslip; everyone else only their own.
+        abort_unless($user->canany(['hrm.edit', 'hrm.approve']) || $item->employee_id === $user->employee?->id, 403);
 
         $item->load(['employee', 'payrollRun.site', 'paidFromAccount']);
         $company = CompanySetting::current();

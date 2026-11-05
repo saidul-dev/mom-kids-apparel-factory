@@ -47,6 +47,7 @@ use App\Http\Controllers\Admin\UnitController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\CurrentSiteController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\MyProfileController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WebsiteController;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +77,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/select-site', [CurrentSiteController::class, 'select'])->name('sites.select');
         Route::post('/switch-site', [CurrentSiteController::class, 'switch'])->name('sites.switch');
 
+        Route::get('/my-profile', [MyProfileController::class, 'show'])->name('my-profile');
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

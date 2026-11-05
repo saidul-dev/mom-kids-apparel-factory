@@ -21,7 +21,7 @@ class AttendanceController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:hrm.view', only: ['summary']),
+            new Middleware('permission:hrm.edit|hrm.approve', only: ['summary']),
             new Middleware('permission:hrm.edit', only: ['register', 'saveRegister']),
         ];
     }

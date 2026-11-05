@@ -13,7 +13,7 @@ class LeaveTypeController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:hrm.view', only: ['index']),
+            new Middleware('permission:hrm.edit|hrm.approve', only: ['index']),
             new Middleware('permission:hrm.create', only: ['create', 'store']),
             new Middleware('permission:hrm.edit', only: ['edit', 'update', 'toggleStatus']),
             new Middleware('permission:hrm.delete', only: ['destroy']),

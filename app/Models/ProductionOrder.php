@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A production lot for one finished garment (product or variant) at one
@@ -197,6 +198,40 @@ class ProductionOrder extends Model
             ->selectRaw('COALESCE(SUM(quantity * unit_cost), 0) as v')->value('v');
 
         return round(max($issued - $finished - (float) $this->wastage_value, 0), 2);
+    }
+
+    /**
+     * Floor-wide picture across every running production at a Site (or
+     * all Sites): lots running, pieces sitting at each stage right now, and
+     * pieces finished today / this month. Pieces only — no money — so any
+     * production screen or dashboard can show it.
+     *
+     * @return array{running: int, floor: array<string, float>, packedToday: float, packedMonth: float}
+     */
+    public static function floorSummary(?int $siteId = null): array
+    {
+        // Each lot's stage totals only ever shrink stage to stage, so summing
+        // them before subtracting gives the same answer as per-lot math.
+        $open = DB::table('production_stage_entries')
+            ->join('production_orders', 'production_orders.id', '=', 'production_stage_entries.production_order_id')
+            ->where('production_orders.status', 'in_progress')
+            ->when($siteId, fn ($q) => $q->where('production_orders.site_id', $siteId))
+            ->selectRaw('stage, SUM(quantity) as total')
+            ->groupBy('stage')
+            ->pluck('total', 'stage');
+        $openTotals = collect(self::STAGES)->map(fn ($l, $stage) => (float) ($open[$stage] ?? 0))->all();
+
+        $packed = fn () => DB::table('production_stage_entries')
+            ->join('production_orders', 'production_orders.id', '=', 'production_stage_entries.production_order_id')
+            ->where('stage', self::FINAL_STAGE)
+            ->when($siteId, fn ($q) => $q->where('production_orders.site_id', $siteId));
+
+        return [
+            'running' => self::where('status', 'in_progress')->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count(),
+            'floor' => (new self)->currentlyAt($openTotals),
+            'packedToday' => (float) $packed()->whereDate('entry_date', today())->sum('quantity'),
+            'packedMonth' => (float) $packed()->whereDate('entry_date', '>=', now()->startOfMonth())->whereDate('entry_date', '<=', today())->sum('quantity'),
+        ];
     }
 
     public function isOpen(): bool

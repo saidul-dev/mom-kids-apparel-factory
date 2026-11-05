@@ -35,21 +35,100 @@
         // Collections, expenses and customer dues are for those who handle
         // money or sales — floor roles (supervisor, HR, employee) see stock only.
         $seesMoney = Auth::user()->canany(['accounts.view', 'sales.view']);
+        // Stock levels matter to whoever buys or uses material; a worker doesn't need them.
+        $seesStock = Auth::user()->canany(['inventory.view', 'production.view']);
         $stats = array_values(array_filter([
             $seesMoney ? ['label' => __("Today's Collection"), 'value' => number_format($todayCollection, 2), 'icon' => 'collection'] : null,
             $seesMoney ? ['label' => __("Today's Expense"), 'value' => number_format($todayExpense, 2), 'icon' => 'expense'] : null,
             $seesMoney ? ['label' => __('Total Receivable (Due)'), 'value' => number_format($totalReceivable, 2), 'icon' => 'due'] : null,
-            [
+            $seesStock ? [
                 'label' => __('Low Stock Items'),
                 'value' => (string) $lowStockCount,
                 'sub' => $criticalCount > 0 ? __(':count critical', ['count' => $criticalCount]) : __('None out of stock'),
                 'alert' => $criticalCount > 0,
                 'icon' => 'stock',
-            ],
+            ] : null,
         ]));
+        $pcs = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.') ?: '0';
     @endphp
 
     <div class="space-y-6">
+        @if ($myWork)
+        <!-- My production work (piece-rate worker) -->
+        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                <h3 class="font-bold text-brand-900">{{ __('My Production Work') }}</h3>
+                <a href="{{ route('my-profile') }}" class="text-xs font-semibold text-accent-600 hover:text-accent-500">{{ __('My Profile') }} &rarr;</a>
+            </div>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                @foreach ([__('Today') => $myWork['today'], __('This month') => $myWork['month']] as $label => $sum)
+                <div class="rounded-xl bg-gradient-to-br from-brand-800 to-brand-700 p-4 text-white">
+                    <span class="block text-[11px] font-semibold uppercase tracking-widest text-brand-200">{{ $label }}</span>
+                    <span class="mt-1 block text-3xl font-bold">{{ $pcs($sum->pcs) }} <span class="text-base font-medium text-brand-200">{{ __('pcs') }}</span></span>
+                    <span class="block text-sm text-brand-100">{{ __('Earned') }}: {{ number_format((float) $sum->amount, 2) }}</span>
+                </div>
+                @endforeach
+            </div>
+            @if ($myWork['recent']->isNotEmpty())
+            <div class="mt-4 overflow-x-auto">
+            <table class="w-full min-w-[520px] text-sm">
+                <thead>
+                    <tr class="border-y border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <th class="px-4 py-2 font-semibold">{{ __('Date') }}</th>
+                        <th class="px-4 py-2 font-semibold">{{ __('Item') }}</th>
+                        <th class="px-4 py-2 font-semibold">{{ __('Work') }}</th>
+                        <th class="px-4 py-2 font-semibold text-right">{{ __('Pieces') }}</th>
+                        <th class="px-4 py-2 font-semibold text-right">{{ __('Earned') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach ($myWork['recent'] as $work)
+                    <tr>
+                        <td class="px-4 py-2 text-slate-500 whitespace-nowrap">{{ $work->entry_date->format('d M') }}</td>
+                        <td class="px-4 py-2 text-slate-800">{{ $work->productionOrder->item_label }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ __($work->stage_label) }}</td>
+                        <td class="px-4 py-2 text-right font-semibold text-slate-800">{{ $pcs($work->quantity) }}</td>
+                        <td class="px-4 py-2 text-right text-slate-700">{{ number_format($work->amount, 2) }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+            </div>
+            @else
+            <p class="mt-4 text-center text-sm text-slate-400">{{ __('No piece work recorded for you yet.') }}</p>
+            @endif
+        </div>
+        @endif
+
+        @if ($production)
+        <!-- Production floor: pieces only -->
+        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                <div>
+                    <h3 class="font-bold text-brand-900">{{ __('Production Floor') }}</h3>
+                    <p class="text-xs text-slate-400">{{ trans_choice(':count production running|:count productions running', $production['running'], ['count' => $production['running']]) }}</p>
+                </div>
+                @can('production.view')
+                <a href="{{ route('production-orders.index') }}" class="text-xs font-semibold text-accent-600 hover:text-accent-500">{{ __('Open Production') }} &rarr;</a>
+                @endcan
+            </div>
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                @foreach (['cutting' => [__('At Cutting'), 'bg-amber-400'], 'sewing' => [__('At Sewing'), 'bg-sky-500'], 'finishing' => [__('At Finishing'), 'bg-violet-500']] as $stage => [$label, $dot])
+                <div class="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><span class="h-2 w-2 rounded-full {{ $dot }}"></span>{{ $label }}</span>
+                    <span class="mt-1 block text-2xl font-bold text-slate-800">{{ $pcs($production['floor'][$stage]) }} <span class="text-sm font-medium text-slate-400">{{ __('pcs') }}</span></span>
+                </div>
+                @endforeach
+                <div class="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
+                    <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>{{ __('Finished Today') }}</span>
+                    <span class="mt-1 block text-2xl font-bold text-emerald-800">{{ $pcs($production['packedToday']) }} <span class="text-sm font-medium text-emerald-600">{{ __('pcs') }}</span></span>
+                    <span class="block text-xs text-emerald-700">{{ $pcs($production['packedMonth']) }} {{ __('pcs this month') }}</span>
+                </div>
+            </div>
+        </div>
+        @endif
+
+        @if ($stats)
         <!-- Stat cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             @foreach ($stats as $stat)
@@ -78,6 +157,7 @@
             </div>
             @endforeach
         </div>
+        @endif
 
         @if ($seesMoney)
         <!-- Charts row -->
@@ -113,6 +193,7 @@
 
         @endif
 
+        @if ($seesMoney || $seesStock)
         <!-- Tables row -->
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
             @if ($seesMoney)
@@ -153,6 +234,7 @@
             </div>
             @endif
 
+            @if ($seesStock)
             <!-- Low stock alerts -->
             <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
                 <div class="flex items-center justify-between mb-4">
@@ -184,7 +266,9 @@
                 </a>
                 @endcan
             </div>
+            @endif
         </div>
+        @endif
     </div>
 
     @if ($seesMoney)

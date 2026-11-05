@@ -74,12 +74,12 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
         ]);
 
-        // Factory floor: adds and updates employees' basic records and
-        // records production (cutting, stage entries, who did the pieces).
-        // No salary/payroll/piece rates, login access, purchases or stock,
-        // and can't complete a lot (that writes off wastage).
+        // Factory floor: records production (cutting, stage entries, who did
+        // the pieces) and sees their own employee profile (My Profile needs
+        // no permission). No employee list, salary/payroll/piece rates,
+        // purchases or stock, and can't complete a lot (that writes off
+        // wastage).
         Role::findOrCreate('Production Supervisor')->syncPermissions([
-            'employees.view', 'employees.create', 'employees.edit',
             'production.view', 'production.create',
         ]);
 

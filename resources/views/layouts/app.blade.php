@@ -267,25 +267,33 @@
                             {{ __('Employees') }}
                         </x-sidebar-sublink>
                         @endcan
-                        @can('hrm.view')
+                        {{-- HR-level (edit or approve) sees the HR lists and everyone's pay;
+                             an Employee login's self-service hrm.view only gets Leave Requests. --}}
+                        @canany(['hrm.edit', 'hrm.approve'])
                         <x-sidebar-sublink :href="route('departments.index')" :active="request()->routeIs('departments.*')">
                             {{ __('Departments') }}
                         </x-sidebar-sublink>
                         <x-sidebar-sublink :href="route('designations.index')" :active="request()->routeIs('designations.*')">
                             {{ __('Designations') }}
                         </x-sidebar-sublink>
+                        @can('hrm.edit')
                         <x-sidebar-sublink :href="route('attendance.register')" :active="request()->routeIs('attendance.register')">
                             {{ __('Attendance Register') }}
                         </x-sidebar-sublink>
+                        @endcan
                         <x-sidebar-sublink :href="route('attendance.summary')" :active="request()->routeIs('attendance.summary')">
                             {{ __('Attendance Summary') }}
                         </x-sidebar-sublink>
                         <x-sidebar-sublink :href="route('leave-types.index')" :active="request()->routeIs('leave-types.*')">
                             {{ __('Leave Types') }}
                         </x-sidebar-sublink>
+                        @endcanany
+                        @can('hrm.view')
                         <x-sidebar-sublink :href="route('leave-requests.index')" :active="request()->routeIs('leave-requests.*')">
                             {{ __('Leave Requests') }}
                         </x-sidebar-sublink>
+                        @endcan
+                        @canany(['hrm.edit', 'hrm.approve'])
                         <x-sidebar-sublink :href="route('piece-rates.index')" :active="request()->routeIs('piece-rates.*')">
                             {{ __('Piece Rates') }}
                         </x-sidebar-sublink>
@@ -295,11 +303,20 @@
                         <x-sidebar-sublink :href="route('payroll-runs.index')" :active="request()->routeIs('payroll-runs.*')">
                             {{ __('Payroll Runs') }}
                         </x-sidebar-sublink>
-                        @endcan
+                        @endcanany
                     </x-sidebar-dropdown>
                     @endcanany
 
                     @if (auth()->user()->employee)
+                    <x-sidebar-link :href="route('my-profile')" :title="__('My Profile')"
+                        :active="request()->routeIs('my-profile')">
+                        <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm1.294 6.336a6.721 6.721 0 0 1-3.17.789 6.721 6.721 0 0 1-3.168-.789 3.376 3.376 0 0 1 6.338 0Z" />
+                        </svg>
+                        <span class="nav-label" :class="$store.sidebar.collapsed && 'lg:hidden'">{{ __('My Profile') }}</span>
+                    </x-sidebar-link>
                     <x-sidebar-link :href="route('attendance.my')" :title="__('My Attendance')"
                         :active="request()->routeIs('attendance.my')">
                         <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8"

@@ -20,7 +20,7 @@ class PieceRateController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:hrm.view', only: ['index']),
+            new Middleware('permission:hrm.edit|hrm.approve', only: ['index']),
             new Middleware('permission:hrm.edit', only: ['update']),
         ];
     }

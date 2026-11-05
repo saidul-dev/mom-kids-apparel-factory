@@ -68,18 +68,20 @@
                 </button>
             </form>
 
-            @if (app()->environment('local'))
+            @if (config('app.demo_logins'))
             @php
             $demoAccounts = [
                 ['role' => 'Super Admin', 'email' => 'admin@businesserp.test'],
                 ['role' => 'Admin', 'email' => 'owner@businesserp.test'],
                 ['role' => 'Manager', 'email' => 'manager@businesserp.test'],
+                ['role' => 'Production Supervisor', 'email' => 'supervisor@businesserp.test'],
                 ['role' => 'HR', 'email' => 'hr@businesserp.test'],
                 ['role' => 'Accountant', 'email' => 'accountant@businesserp.test'],
+                ['role' => 'Employee', 'email' => 'employee@businesserp.test'],
             ];
             @endphp
             <div class="mt-6 border-t border-slate-100 pt-4">
-                <p class="text-xs text-slate-400">{{ __('Quick fill (dev only)') }}</p>
+                <p class="text-xs text-slate-400">{{ __('Demo accounts — tap to fill (password: password)') }}</p>
                 <div class="mt-2 flex flex-wrap gap-1.5">
                     @foreach ($demoAccounts as $account)
                     <button type="button"

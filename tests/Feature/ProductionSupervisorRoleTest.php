@@ -38,24 +38,27 @@ class ProductionSupervisorRoleTest extends TestCase
         $this->actingAs($this->supervisor);
     }
 
-    public function test_the_supervisor_adds_and_updates_employees_but_not_their_pay_or_login(): void
+    public function test_the_supervisor_sees_only_their_own_profile_not_the_employee_list(): void
     {
-        $this->get(route('employees.index'))->assertOk()->assertSee('Add');
-        $this->get(route('employees.create'))->assertOk();
-
-        $this->post(route('employees.store'), [
+        $colleague = Employee::create([
             'site_id' => $this->factory->id, 'name' => 'Rahima Begum', 'phone' => '01711111111', 'email' => 'rahima@example.test',
             'joining_date' => '2026-11-01', 'employment_type' => 'permanent', 'employment_status' => 'active',
-        ])->assertSessionHasNoErrors();
-        $employee = Employee::where('name', 'Rahima Begum')->firstOrFail();
+        ]);
+        $me = Employee::create([
+            'site_id' => $this->factory->id, 'name' => 'Jamal Uddin', 'phone' => '01700000097', 'email' => 'jamal@example.test',
+            'joining_date' => '2026-01-01', 'employment_type' => 'permanent', 'employment_status' => 'active',
+        ]);
+        $me->user_id = $this->supervisor->id;
+        $me->save();
 
-        $this->get(route('employees.edit', $employee))->assertOk()
-            ->assertDontSee('Salary Structure')
-            ->assertDontSee('Login Access');
+        $this->get(route('employees.index'))->assertForbidden();
+        $this->get(route('employees.create'))->assertForbidden();
+        $this->get(route('employees.edit', $colleague))->assertForbidden();
+        $this->get(route('employees.edit', $me))->assertForbidden();
 
-        $this->put(route('employees.salary.update', $employee), ['mode' => 'piece_rate', 'effective_from' => '2026-11-01'])->assertForbidden();
-        $this->patch(route('employees.toggle-login', $employee))->assertForbidden();
-        $this->delete(route('employees.destroy', $employee))->assertForbidden();
+        $this->get(route('my-profile'))->assertOk()
+            ->assertSee('Jamal Uddin')
+            ->assertDontSee('Rahima Begum');
     }
 
     public function test_the_supervisor_records_production_but_cannot_complete_it_or_touch_purchases_and_payroll(): void
@@ -99,10 +102,10 @@ class ProductionSupervisorRoleTest extends TestCase
         $this->get(route('piece-rates.index'))->assertForbidden();
     }
 
-    public function test_the_menu_shows_only_employees_and_production(): void
+    public function test_the_menu_shows_only_production(): void
     {
         $this->get(route('production-orders.index'))->assertOk()
-            ->assertSee(route('employees.index'))
+            ->assertDontSee(route('employees.index'))
             ->assertSee(route('production-orders.index'))
             ->assertDontSee(route('payroll-runs.index'))
             ->assertDontSee(route('purchases.index'));
@@ -110,6 +113,7 @@ class ProductionSupervisorRoleTest extends TestCase
         // No collection / expense / due figures on their dashboard.
         $this->get(route('dashboard'))->assertOk()
             ->assertSee('New Production')
+            ->assertSee('Production Floor')
             ->assertSee('Low Stock Items')
             ->assertDontSee('Recent Collections')
             ->assertDontSee("Today's Collection", false)
