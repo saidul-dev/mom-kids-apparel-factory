@@ -2,11 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Attribute;
-use App\Models\AttributeValue;
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\ProductVariant;
 use App\Models\Unit;
 use Illuminate\Database\Seeder;
 
@@ -46,48 +43,22 @@ class GarmentsFactorySeeder extends Seeder
             $this->product($item['name'], 'raw_material', $categories['Raw Material'], $units[$item['unit']], 0, $item['reorder']);
         }
 
-        $babySizes = ['0-3M', '3-6M', '6-12M'];
-        $kidsSizes = ['1-2Y', '2-3Y', '3-4Y', '4-5Y', '5-6Y', '7-8Y'];
-        $momSizes = ['S', 'M', 'L', 'XL', 'XXL'];
-
         $finishedGoods = [
-            ['name' => 'Baby Romper', 'category' => 'Baby Wear', 'price' => 380, 'sizes' => $babySizes],
-            ['name' => 'Baby Jhabla Set', 'category' => 'Baby Wear', 'price' => 320, 'sizes' => $babySizes],
-            ['name' => 'Girls Silk Frock', 'category' => 'Kids Wear', 'price' => 650, 'sizes' => $kidsSizes],
-            ['name' => 'Kids Round Neck T-Shirt', 'category' => 'Kids Wear', 'price' => 250, 'sizes' => $kidsSizes],
-            ['name' => 'Kids Pajama Set', 'category' => 'Kids Wear', 'price' => 450, 'sizes' => $kidsSizes],
-            ['name' => 'Maternity Gown', 'category' => 'Mom Wear', 'price' => 950, 'sizes' => $momSizes],
-            ['name' => 'Nursing Top', 'category' => 'Mom Wear', 'price' => 650, 'sizes' => $momSizes],
+            ['name' => 'Baby Romper', 'category' => 'Baby Wear', 'price' => 380],
+            ['name' => 'Baby Jhabla Set', 'category' => 'Baby Wear', 'price' => 320],
+            ['name' => 'Girls Silk Frock', 'category' => 'Kids Wear', 'price' => 650],
+            ['name' => 'Kids Round Neck T-Shirt', 'category' => 'Kids Wear', 'price' => 250],
+            ['name' => 'Kids Pajama Set', 'category' => 'Kids Wear', 'price' => 450],
+            ['name' => 'Maternity Gown', 'category' => 'Mom Wear', 'price' => 950],
+            ['name' => 'Nursing Top', 'category' => 'Mom Wear', 'price' => 650],
         ];
 
-        $sizeAttributeId = Attribute::where('name', 'Size')->value('id');
-        $sizeValueIds = AttributeValue::where('attribute_id', $sizeAttributeId)->pluck('id', 'value');
-
         foreach ($finishedGoods as $item) {
-            $product = $this->product($item['name'], 'finished_good', $categories[$item['category']], $units['Pcs'], $item['price'], 0, (bool) $sizeAttributeId);
-
-            if (! $sizeAttributeId) {
-                continue;
-            }
-
-            foreach ($item['sizes'] as $size) {
-                if (! isset($sizeValueIds[$size])) {
-                    continue;
-                }
-
-                $variant = ProductVariant::firstOrCreate(
-                    ['sku' => "{$product->sku}-".strtoupper($size)],
-                    ['product_id' => $product->id, 'selling_price' => $item['price'], 'estimated_cost' => 0, 'status' => true]
-                );
-                if (! $variant->barcode) {
-                    $variant->update(['barcode' => Product::internalBarcode('21', $variant->id)]);
-                }
-
-                $variant->attributeValues()->syncWithoutDetaching([
-                    $sizeValueIds[$size] => ['attribute_id' => $sizeAttributeId],
-                ]);
-            }
+            $this->product($item['name'], 'finished_good', $categories[$item['category']], $units['Pcs'], $item['price'], 0, true);
         }
+
+        // Every garment in every size of the factory's size run.
+        $this->call(GarmentSizeSeeder::class);
     }
 
     /**
