@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'Business ERP') }} — {{ $title ?? __('Dashboard') }}</title>
@@ -16,7 +16,12 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="font-sans antialiased bg-slate-100" x-data="{ sidebarOpen: false }">
+@php
+    // Below lg, floor roles get a phone-app shell (app bar + bottom tabs)
+    // instead of the sidebar and topbar; large screens keep this layout.
+    $appMode = auth()->user()->usesAppShell();
+@endphp
+<body class="font-sans antialiased bg-slate-100 {{ $appMode ? 'max-lg:bg-slate-50' : '' }}" x-data="{ sidebarOpen: false }">
     <div class="min-h-screen">
 
         <!-- Mobile sidebar backdrop -->
@@ -25,7 +30,7 @@
 
         <!-- Sidebar -->
         <aside
-            class="fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-brand-900 via-brand-900 to-brand-950 text-brand-100 flex flex-col transform transition-all duration-200 lg:translate-x-0"
+            class="fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-brand-900 via-brand-900 to-brand-950 text-brand-100 flex flex-col transform transition-all duration-200 lg:translate-x-0 {{ $appMode ? 'max-lg:hidden' : '' }}"
             :class="[sidebarOpen ? 'translate-x-0' : '-translate-x-full', $store.sidebar.collapsed ? 'lg:w-20' : 'lg:w-64']">
 
             <!-- Collapse/expand toggle (desktop only) -->
@@ -448,7 +453,7 @@
 
             <!-- Topbar -->
             <header
-                class="sticky top-0 z-20 h-16 bg-white/90 backdrop-blur border-b border-slate-200 flex items-center gap-2 sm:gap-4 px-3 sm:px-6">
+                class="sticky top-0 z-20 h-16 bg-white/90 backdrop-blur border-b border-slate-200 flex items-center gap-2 sm:gap-4 px-3 sm:px-6 {{ $appMode ? 'max-lg:hidden' : '' }}">
                 <button class="lg:hidden shrink-0 text-brand-800" @click="sidebarOpen = true">
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -704,9 +709,23 @@
                 </div>
             </header>
 
+            @if ($appMode && ! request()->routeIs('dashboard'))
+            <!-- Phone app bar (the dashboard draws its own home header) -->
+            <div class="sticky top-0 z-20 bg-brand-900 text-white lg:hidden" style="padding-top: env(safe-area-inset-top)">
+                <div class="flex h-14 items-center gap-2 px-2">
+                    <button type="button" aria-label="{{ __('Back') }}"
+                        onclick="history.length > 1 ? history.back() : (location.href = @js(route('dashboard')))"
+                        class="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+                    </button>
+                    <h1 class="min-w-0 flex-1 truncate text-base font-semibold">{{ $title ?? __('Dashboard') }}</h1>
+                </div>
+            </div>
+            @endif
+
             <!-- Page Heading -->
             @isset($header)
-            <div class="px-4 sm:px-6 pt-6">
+            <div class="px-4 sm:px-6 pt-6 {{ $appMode ? 'max-lg:hidden' : '' }}">
                 {{ $header }}
             </div>
             @endisset
@@ -741,11 +760,57 @@
             @endif
 
             <!-- Page Content -->
-            <main class="flex-1 min-w-0 px-4 sm:px-6 py-6">
+            <main class="flex-1 min-w-0 px-4 sm:px-6 py-6 {{ $appMode ? 'max-lg:pb-28' : '' }}">
                 {{ $slot }}
             </main>
         </div>
     </div>
+
+    @if ($appMode)
+    @php
+        $tabs = [
+            ['route' => 'dashboard', 'active' => 'dashboard', 'label' => __('Home'),
+             'icon' => 'm2.25 12 8.954-8.955a1.126 1.126 0 0 1 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'],
+            ['route' => 'production-orders.index', 'active' => ['production-orders.index', 'production-orders.show'], 'label' => __('Production'),
+             'icon' => 'M7.848 8.25l1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 1-5.196 3 3 3 0 0 1 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.838c.005-.352.054-.695.14-1.025m-1.223 2.863 2.077-1.199m0-3.328a4.323 4.323 0 0 1 2.068-1.379l5.325-1.628a4.5 4.5 0 0 1 2.48-.044l.803.215-7.794 4.5m-2.882-1.664A4.33 4.33 0 0 0 10.607 12m3.736 0 7.794 4.5-.802.215a4.5 4.5 0 0 1-2.48-.043l-5.326-1.629a4.324 4.324 0 0 1-2.068-1.379M14.343 12l-2.882 1.664'],
+            null, // centre: New production
+            ['route' => 'attendance.my', 'active' => 'attendance.my', 'label' => __('Attendance'),
+             'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
+            ['route' => 'my-profile', 'active' => ['my-profile', 'profile.edit'], 'label' => __('Me'),
+             'icon' => 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z'],
+        ];
+    @endphp
+    <!-- Phone bottom tabs -->
+    <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white lg:hidden"
+        style="padding-bottom: env(safe-area-inset-bottom)" aria-label="{{ __('Main') }}">
+        <div class="mx-auto grid h-16 max-w-md grid-cols-5">
+            @foreach ($tabs as $tab)
+            @if ($tab === null)
+                @can('production.create')
+                <a href="{{ route('production-orders.create') }}" aria-label="{{ __('New production') }}"
+                    class="group relative flex flex-col items-center justify-end focus-visible:outline-none">
+                    <span class="absolute -top-5 grid h-14 w-14 place-items-center rounded-full text-white shadow-lg shadow-accent-500/40 ring-4 ring-white group-focus-visible:ring-accent-200
+                        {{ request()->routeIs('production-orders.create') ? 'bg-accent-600' : 'bg-accent-500' }}">
+                        <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke-width="2.4" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    </span>
+                    <span class="pb-2 text-[11px] font-medium text-slate-500">{{ __('New') }}</span>
+                </a>
+                @else
+                <span></span>
+                @endcan
+            @else
+                @php $on = request()->routeIs($tab['active']); @endphp
+                <a href="{{ route($tab['route']) }}" @if ($on) aria-current="page" @endif
+                    class="flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium focus-visible:outline-none focus-visible:bg-slate-50 {{ $on ? 'text-brand-800' : 'text-slate-400' }}">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="{{ $on ? 2 : 1.6 }}" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $tab['icon'] }}"/></svg>
+                    <span>{{ $tab['label'] }}</span>
+                    <span class="h-1 w-1 rounded-full {{ $on ? 'bg-accent-500' : 'bg-transparent' }}"></span>
+                </a>
+            @endif
+            @endforeach
+        </div>
+    </nav>
+    @endif
 </body>
 
 </html>

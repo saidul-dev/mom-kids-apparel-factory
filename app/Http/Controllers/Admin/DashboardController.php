@@ -10,6 +10,7 @@ use App\Models\Party;
 use App\Models\Product;
 use App\Models\ProductionOrder;
 use App\Models\ProductionPieceWork;
+use App\Models\ProductionStageEntry;
 use App\Models\StockMovement;
 use Illuminate\Support\Facades\Auth;
 
@@ -57,6 +58,15 @@ class DashboardController extends Controller
             ? ProductionOrder::floorSummary($siteId)
             : null;
 
+        // Latest stage entries on the floor, for the phone home screen.
+        $floorActivity = $user->can('production.view')
+            ? ProductionStageEntry::with(['productionOrder.product', 'productionOrder.productVariant.attributeValues'])
+                ->when($siteId, fn ($q) => $q->whereHas('productionOrder', fn ($q) => $q->where('site_id', $siteId)))
+                ->latest('id')
+                ->limit(5)
+                ->get()
+            : collect();
+
         // A worker's own piece work: today, this month, latest entries.
         $myWork = null;
         if ($employee && ($employee->salaryStructure?->mode === 'piece_rate' || $employee->pieceWorks()->exists())) {
@@ -76,7 +86,7 @@ class DashboardController extends Controller
             'lowStockItems', 'lowStockCount', 'criticalCount',
             'chartLabels', 'collectionSeries', 'expenseSeries',
             'topOverdueCustomers', 'recentCollections',
-            'production', 'myWork',
+            'production', 'myWork', 'floorActivity',
         ));
     }
 

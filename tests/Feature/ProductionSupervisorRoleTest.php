@@ -119,8 +119,18 @@ class ProductionSupervisorRoleTest extends TestCase
             ->assertDontSee("Today's Collection", false)
             ->assertDontSee('collectionChart');
 
+        // Phone app shell: home header, bottom tabs, app bar on inner pages.
+        $this->get(route('dashboard'))
+            ->assertSee('Finished today')
+            ->assertSee('aria-label="Main"', false);
+        $this->get(route('production-orders.index'))
+            ->assertSee('aria-label="Back"', false)
+            ->assertSee('aria-label="Main"', false);
+
         $owner = User::factory()->create();
         $owner->assignRole('Admin');
-        $this->actingAs($owner)->get(route('dashboard'))->assertOk()->assertSee('Recent Collections');
+        $this->actingAs($owner)->get(route('dashboard'))->assertOk()
+            ->assertSee('Recent Collections')
+            ->assertDontSee('aria-label="Main"', false);
     }
 }

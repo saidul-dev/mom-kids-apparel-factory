@@ -50,9 +50,143 @@
             ] : null,
         ]));
         $pcs = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.') ?: '0';
+        $appMode = Auth::user()->usesAppShell();
     @endphp
 
-    <div class="space-y-6">
+    @if ($appMode)
+    @php
+        $me = Auth::user();
+        $firstName = strtok($me->employee->name ?? $me->name, ' ');
+        $stageLook = [
+            'cutting' => ['label' => __('Cutting'), 'bar' => 'bg-amber-400', 'dot' => 'bg-amber-400'],
+            'sewing' => ['label' => __('Sewing'), 'bar' => 'bg-sky-500', 'dot' => 'bg-sky-500'],
+            'finishing' => ['label' => __('Finishing'), 'bar' => 'bg-violet-500', 'dot' => 'bg-violet-500'],
+            'packing' => ['label' => __('Blister / Poly'), 'bar' => 'bg-emerald-500', 'dot' => 'bg-emerald-500'],
+        ];
+        $onFloor = $production ? array_sum(array_intersect_key($production['floor'], array_flip(['cutting', 'sewing', 'finishing']))) : 0;
+        $tiles = array_filter([
+            Auth::user()->can('production.create') ? ['href' => route('production-orders.create'), 'label' => __('New production'), 'tint' => 'bg-accent-500 text-white',
+                'icon' => 'M12 4.5v15m7.5-7.5h-15'] : null,
+            ['href' => route('production-orders.index'), 'label' => __('Productions'), 'tint' => 'bg-sky-50 text-sky-700',
+                'icon' => 'M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z'],
+            $me->employee ? ['href' => route('attendance.my'), 'label' => __('Attendance'), 'tint' => 'bg-amber-50 text-amber-700',
+                'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'] : null,
+            $me->employee ? ['href' => route('my-profile'), 'label' => __('My profile'), 'tint' => 'bg-violet-50 text-violet-700',
+                'icon' => 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z'] : null,
+        ]);
+    @endphp
+    <!-- Phone home screen (the regular dashboard below is for large screens) -->
+    <div class="lg:hidden">
+        <div class="-mx-4 -mt-6 rounded-b-[2rem] bg-brand-900 px-5 pb-24 text-white" style="padding-top: calc(env(safe-area-inset-top) + 1.25rem)">
+            <div class="flex items-center gap-3">
+                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15 text-lg font-bold ring-2 ring-white/25">{{ mb_strtoupper(mb_substr($firstName, 0, 1)) }}</span>
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-lg font-semibold leading-tight">{{ __('Hello, :name', ['name' => $firstName]) }}</p>
+                    <p class="truncate text-sm text-brand-200">{{ $me->currentSite->name ?? __('All Sites') }}</p>
+                </div>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" aria-label="{{ __('Log out') }}"
+                        class="grid h-10 w-10 place-items-center rounded-full bg-white/10 hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        @if ($production)
+        <!-- Finished today, with where the rest of the pieces are -->
+        <div class="relative -mt-16 rounded-3xl bg-white p-5 shadow-xl shadow-brand-900/10 ring-1 ring-slate-200">
+            <div class="flex items-end justify-between gap-4">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">{{ __('Finished today') }}</p>
+                    <p class="mt-1 text-5xl font-extrabold leading-none tracking-tight text-brand-900 tabular-nums">{{ $pcs($production['packedToday']) }}<span class="ml-1.5 text-lg font-semibold text-slate-400">{{ __('pcs') }}</span></p>
+                </div>
+                <div class="text-right">
+                    <p class="text-lg font-bold text-slate-800 tabular-nums">{{ $pcs($production['packedMonth']) }}</p>
+                    <p class="text-xs text-slate-500">{{ __('this month') }}</p>
+                </div>
+            </div>
+
+            <div class="mt-5">
+                <div class="flex items-baseline justify-between text-xs text-slate-500">
+                    <span>{{ __('On the floor now') }}</span>
+                    <span class="font-semibold text-slate-700 tabular-nums">{{ $pcs($onFloor) }} {{ __('pcs') }}</span>
+                </div>
+                <div class="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100" role="img"
+                    aria-label="{{ __('Cutting :c, sewing :s, finishing :f pieces', ['c' => $pcs($production['floor']['cutting']), 's' => $pcs($production['floor']['sewing']), 'f' => $pcs($production['floor']['finishing'])]) }}">
+                    @if ($onFloor > 0)
+                    @foreach (['cutting', 'sewing', 'finishing'] as $stage)
+                    <div class="{{ $stageLook[$stage]['bar'] }}" style="width: {{ $production['floor'][$stage] / $onFloor * 100 }}%"></div>
+                    @endforeach
+                    @endif
+                </div>
+                <div class="mt-3 grid grid-cols-3 gap-2">
+                    @foreach (['cutting', 'sewing', 'finishing'] as $stage)
+                    <div>
+                        <span class="flex items-center gap-1.5 text-xs text-slate-500"><span class="h-2 w-2 rounded-full {{ $stageLook[$stage]['dot'] }}"></span>{{ $stageLook[$stage]['label'] }}</span>
+                        <span class="block text-base font-bold text-slate-800 tabular-nums">{{ $pcs($production['floor'][$stage]) }}</span>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        @endif
+
+        <!-- Services -->
+        <div class="mt-5 grid grid-cols-4 gap-2 rounded-3xl bg-white p-4 ring-1 ring-slate-200">
+            @foreach ($tiles as $tile)
+            <a href="{{ $tile['href'] }}" class="flex flex-col items-center gap-2 rounded-2xl p-1 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500">
+                <span class="grid h-14 w-14 place-items-center rounded-2xl {{ $tile['tint'] }}">
+                    <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $tile['icon'] }}"/></svg>
+                </span>
+                <span class="text-xs font-medium leading-tight text-slate-700">{{ $tile['label'] }}</span>
+            </a>
+            @endforeach
+        </div>
+
+        @if ($production)
+        <!-- Latest on the floor -->
+        <div class="mt-5">
+            <div class="mb-2 flex items-baseline justify-between px-1">
+                <h2 class="text-base font-semibold text-slate-800">{{ __('Latest on the floor') }}</h2>
+                <span class="text-xs text-slate-500">{{ trans_choice(':count running|:count running', $production['running'], ['count' => $production['running']]) }}</span>
+            </div>
+            <div class="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200">
+                @forelse ($floorActivity as $entry)
+                <a href="{{ route('production-orders.show', $entry->productionOrder) }}" class="flex items-center gap-3 px-4 py-3 active:bg-slate-50">
+                    <span class="h-9 w-1.5 shrink-0 rounded-full {{ $stageLook[$entry->stage]['bar'] }}"></span>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-semibold text-slate-800">{{ $entry->productionOrder->item_label }}</p>
+                        <p class="truncate text-xs text-slate-500">{{ $entry->productionOrder->production_no }}, {{ $entry->created_at->diffForHumans() }}</p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                        <p class="text-sm font-bold text-slate-800 tabular-nums">{{ $pcs($entry->quantity) }} {{ __('pcs') }}</p>
+                        <p class="text-xs text-slate-500">{{ $stageLook[$entry->stage]['label'] }}</p>
+                    </div>
+                </a>
+                @empty
+                <div class="px-4 py-8 text-center">
+                    <p class="text-sm text-slate-500">{{ __('Nothing recorded yet.') }}</p>
+                    @can('production.create')
+                    <a href="{{ route('production-orders.create') }}" class="mt-2 inline-block text-sm font-semibold text-accent-700">{{ __('Start a production') }}</a>
+                    @endcan
+                </div>
+                @endforelse
+            </div>
+        </div>
+        @endif
+
+        @if ($lowStockCount > 0)
+        <div class="mt-5 flex items-center gap-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-rose-200">
+            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+            <span>{{ trans_choice(':count material is running low|:count materials are running low', $lowStockCount, ['count' => $lowStockCount]) }}</span>
+        </div>
+        @endif
+    </div>
+    @endif
+
+    <div class="space-y-6 {{ $appMode ? 'max-lg:hidden' : '' }}">
         @if ($myWork)
         <!-- My production work (piece-rate worker) -->
         <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">

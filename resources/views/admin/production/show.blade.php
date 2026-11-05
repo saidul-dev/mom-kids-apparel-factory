@@ -22,6 +22,11 @@
         'packing' => [__('Blister / Poly'), __('from finishing → finished stock')],
     ];
     $materials = $fabrics->concat($accessories);
+    // Costs are for whoever closes lots (manager/admin), not the floor supervisor.
+    $seesCost = auth()->user()->can('production.approve');
+    // On the phone app the day's job (update progress) comes right after the
+    // stage cards; costs, outside work and history follow.
+    $later = auth()->user()->usesAppShell() ? 'max-lg:order-last' : '';
 @endphp
 <x-app-layout>
     <x-slot name="title">{{ $order->production_no }}</x-slot>
@@ -37,6 +42,7 @@
         </div>
     </x-slot>
 
+    <div class="flex flex-col">
     <!-- Header -->
     <div class="mb-4 rounded-2xl bg-gradient-to-r from-brand-900 to-brand-700 p-6 text-white shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-4">
@@ -91,16 +97,16 @@
             @endif
         </div>
 
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
             @foreach ($pipeline as $i => $step)
-            <div class="relative rounded-2xl p-5 ring-1 {{ $step['now'] > 0 ? $color[$step['key']]['soft'] : 'bg-slate-50 ring-slate-200' }}">
+            <div class="relative rounded-2xl p-4 sm:p-5 ring-1 {{ $step['now'] > 0 ? $color[$step['key']]['soft'] : 'bg-slate-50 ring-slate-200' }}">
                 @if ($i < 3)
                 <svg class="absolute -right-3 top-1/2 z-10 hidden h-6 w-6 -translate-y-1/2 rounded-full bg-white p-1 text-slate-400 shadow ring-1 ring-slate-200 lg:block" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
                 @endif
                 <span class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide {{ $color[$step['key']]['text'] }}">
                     <span class="h-2 w-2 rounded-full {{ $color[$step['key']]['dot'] }}"></span>{{ $step['label'] }}
                 </span>
-                <span class="mt-2 block text-4xl font-bold text-slate-800">{{ $qty($step['now']) }}<span class="ml-1 text-base font-medium text-slate-400">{{ $unit }}</span></span>
+                <span class="mt-2 block text-3xl sm:text-4xl font-bold text-slate-800">{{ $qty($step['now']) }}<span class="ml-1 text-base font-medium text-slate-400">{{ $unit }}</span></span>
                 <span class="block text-sm text-slate-500">{{ $step['nowLabel'] }}</span>
                 @if ($step['total'] !== null)
                 <span class="mt-3 block border-t border-black/5 pt-2 text-xs text-slate-500">{{ __('Total') }}: <b class="text-slate-700">{{ $qty($step['total']) }}</b> {{ $step['totalLabel'] }}</span>
@@ -121,7 +127,7 @@
         @endif
     </div>
 
-    <div class="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div class="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3 {{ $later }}">
         <!-- Material used -->
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 lg:col-span-2">
             <div class="border-b border-slate-100 px-5 py-3">
@@ -134,7 +140,9 @@
                         <th class="px-5 py-2.5 font-semibold">{{ __('Item') }}</th>
                         <th class="px-5 py-2.5 font-semibold">{{ __('Used at') }}</th>
                         <th class="px-5 py-2.5 font-semibold text-right">{{ __('Quantity') }}</th>
+                        @if ($seesCost)
                         <th class="px-5 py-2.5 font-semibold text-right">{{ __('Cost') }}</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -145,7 +153,9 @@
                             <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 {{ $color[$m->stage]['chip'] }}">{{ __(\App\Models\ProductionOrder::STAGES[$m->stage]) }}</span>
                         </td>
                         <td class="px-5 py-2.5 text-right text-slate-800">{{ $qty($m->quantity) }} {{ $m->product->stockUnit?->short_name }}</td>
+                        @if ($seesCost)
                         <td class="px-5 py-2.5 text-right text-slate-600">{{ number_format((float) $m->quantity * (float) $m->unit_cost, 2) }}</td>
+                        @endif
                     </tr>
                     @empty
                     <tr><td colspan="4" class="px-5 py-6 text-center text-slate-400">{{ __('No material recorded.') }}</td></tr>
@@ -157,8 +167,9 @@
 
         <!-- Numbers -->
         <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <h3 class="mb-4 text-sm font-semibold text-slate-800">{{ __('Cost') }}</h3>
+            <h3 class="mb-4 text-sm font-semibold text-slate-800">{{ $seesCost ? __('Cost') : __('Fabric use') }}</h3>
             <dl class="space-y-3 text-sm">
+                @if ($seesCost)
                 <div class="flex justify-between"><dt class="text-slate-500">{{ __('Material cost') }}</dt><dd class="font-semibold text-slate-800">{{ number_format($materialCost, 2) }}</dd></div>
                 @if ($cut > 0)
                 <div class="flex justify-between"><dt class="text-slate-500">{{ __('Material cost / pc') }}</dt><dd class="font-semibold text-slate-800">{{ number_format($materialCost / $cut, 2) }}</dd></div>
@@ -169,15 +180,18 @@
                 <div class="flex justify-between border-t border-slate-100 pt-3"><dt class="text-slate-500">{{ __('Total cost / pc') }}</dt><dd class="font-semibold text-slate-800">{{ number_format(($materialCost + $outsideCost) / $cut, 2) }}</dd></div>
                 @endif
                 @endif
+                @endif
                 @php
                     $fabricUnits = $fabrics->map(fn ($m) => $m->product->stockUnit?->short_name)->filter()->unique();
                 @endphp
                 @if ($cut > 0 && $fabricUnits->count() === 1)
                 <div class="flex justify-between"><dt class="text-slate-500">{{ __('Fabric / pc') }}</dt><dd class="font-semibold text-slate-800">{{ number_format($fabrics->sum(fn ($m) => (float) $m->quantity) / $cut, 3) }} {{ $fabricUnits->first() }}</dd></div>
                 @endif
+                @if ($seesCost)
                 <div class="flex justify-between"><dt class="text-slate-500">{{ __('Still in process (WIP)') }}</dt><dd class="font-semibold text-slate-800">{{ number_format($wipValue, 2) }}</dd></div>
                 @if ((float) $order->wastage_value > 0)
                 <div class="flex justify-between"><dt class="text-rose-600">{{ __('Wastage written off') }}</dt><dd class="font-semibold text-rose-600">{{ number_format($order->wastage_value, 2) }}</dd></div>
+                @endif
                 @endif
             </dl>
             @if ($order->note)
@@ -192,7 +206,7 @@
         $owOld = old('work_type') !== null;
     @endphp
     @if ($order->outsideWorks->isNotEmpty() || $order->isOpen())
-    <div class="mb-4 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+    <div class="mb-4 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 {{ $later }}">
         <div class="border-b border-slate-100 px-5 py-3">
             <h3 class="text-sm font-semibold text-slate-800">{{ __('Outside Work (Embroidery, Print…)') }}</h3>
             <p class="text-xs text-slate-400">{{ __('Work done by another party before finishing — its cost is added to the per-piece cost.') }}</p>
@@ -504,7 +518,7 @@
     @endif
 
     <!-- History -->
-    <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 {{ $later }}">
         <h3 class="mb-5 text-sm font-semibold text-slate-800">{{ __('History') }}</h3>
         <ol class="relative ml-2 border-l-2 border-slate-100">
             @foreach ($order->stageEntries as $entry)
@@ -542,5 +556,6 @@
             </li>
             @endforeach
         </ol>
+    </div>
     </div>
 </x-app-layout>

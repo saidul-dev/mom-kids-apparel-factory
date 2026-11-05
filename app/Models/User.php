@@ -83,6 +83,15 @@ class User extends Authenticatable
      * Super Admin and Admin see every site by default ("All Sites") — they
      * are not restricted to the sites they happen to be individually assigned to.
      */
+    /**
+     * Floor roles get the phone-app shell on small screens (home screen,
+     * app bar, bottom tabs) instead of the sidebar admin layout.
+     */
+    public function usesAppShell(): bool
+    {
+        return $this->hasRole('Production Supervisor');
+    }
+
     public function seesAllSites(): bool
     {
         return $this->hasRole(['Super Admin', 'Admin']);
