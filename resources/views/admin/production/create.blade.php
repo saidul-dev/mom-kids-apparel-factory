@@ -1,3 +1,6 @@
+@php
+    $appMode = auth()->user()->usesAppShell();
+@endphp
 <x-app-layout>
     <x-slot name="title">{{ __('New Production') }}</x-slot>
     <x-slot name="header">
@@ -43,9 +46,9 @@
 
                 <div class="space-y-5 lg:col-span-2">
                     <!-- 1. What -->
-                    <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                        <div class="mb-5 flex items-center gap-3">
-                            <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-800 text-sm font-bold text-white">1</span>
+                    <section class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+                        <div class="mb-4 flex items-center gap-3 sm:mb-5">
+                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-800 text-sm font-bold text-white">1</span>
                             <div>
                                 <h3 class="font-semibold text-slate-800">{{ __('What are you making?') }}</h3>
                                 <p class="text-xs text-slate-500">{{ __('Pick the item and its size. Another size = another production.') }}</p>
@@ -73,9 +76,9 @@
                     </section>
 
                     <!-- 2. Fabric -->
-                    <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                        <div class="mb-5 flex items-center gap-3">
-                            <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-800 text-sm font-bold text-white">2</span>
+                    <section class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+                        <div class="mb-4 flex items-center gap-3 sm:mb-5">
+                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-800 text-sm font-bold text-white">2</span>
                             <div>
                                 <h3 class="font-semibold text-slate-800">{{ __('Fabric used') }}</h3>
                                 <p class="text-xs text-slate-500">{{ __('Enter how much was used, in the fabric\'s own unit.') }}</p>
@@ -111,21 +114,29 @@
 
                         <div class="mt-4 space-y-3">
                             <template x-for="(item, i) in items" :key="item.id">
-                                <div class="flex flex-wrap items-center gap-4 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                                {{-- Phone: name and stock on top, quantity full width below; sm+: one row. --}}
+                                <div class="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200 sm:flex sm:items-center sm:gap-4 sm:p-4">
                                     <input type="hidden" :name="'fabrics[' + i + '][item]'" :value="item.id">
-                                    <div class="min-w-0 flex-1">
-                                        <span class="block truncate font-semibold text-slate-800" x-text="item.name"></span>
-                                        <span class="mt-0.5 block text-xs"
-                                              :class="(Number(item.quantity) || 0) > item.balance ? 'text-rose-600 font-semibold' : 'text-slate-500'"
-                                              x-text="'{{ __('In stock') }}: ' + item.balance + ' ' + (item.unit || '') + ' · {{ __('left after') }}: ' + +(item.balance - (Number(item.quantity) || 0)).toFixed(2) + ' ' + (item.unit || '')"></span>
+                                    <div class="flex items-start gap-2 sm:min-w-0 sm:flex-1">
+                                        <div class="min-w-0 flex-1">
+                                            <span class="block break-words font-semibold leading-snug text-slate-800 sm:truncate" x-text="item.name"></span>
+                                            <span class="mt-1 flex flex-wrap gap-x-3 text-xs"
+                                                  :class="(Number(item.quantity) || 0) > item.balance ? 'text-rose-600 font-semibold' : 'text-slate-500'">
+                                                <span x-text="'{{ __('In stock') }}: ' + item.balance + ' ' + (item.unit || '')"></span>
+                                                <span x-text="'{{ __('Left after') }}: ' + +(item.balance - (Number(item.quantity) || 0)).toFixed(2) + ' ' + (item.unit || '')"></span>
+                                            </span>
+                                        </div>
+                                        <button type="button" @click="removeItem(item.id)" class="-mr-1 -mt-1 rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:hidden" aria-label="{{ __('Remove') }}">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                                        </button>
                                     </div>
-                                    <div class="flex items-center overflow-hidden rounded-lg bg-white ring-1 ring-slate-300 focus-within:ring-2 focus-within:ring-accent-500">
-                                        <input type="number" step="0.01" min="0.01" :max="item.balance"
+                                    <div class="mt-3 flex items-center overflow-hidden rounded-lg bg-white ring-1 ring-slate-300 focus-within:ring-2 focus-within:ring-accent-500 sm:mt-0">
+                                        <input type="number" step="0.01" min="0.01" :max="item.balance" inputmode="decimal"
                                                :name="'fabrics[' + i + '][quantity]'" x-model.number="item.quantity"
-                                               class="w-28 border-0 text-right text-base font-semibold focus:ring-0" placeholder="0" required>
-                                        <span class="bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600" x-text="item.unit || ''"></span>
+                                               class="w-full min-w-0 border-0 py-2.5 text-right text-lg font-semibold focus:ring-0 sm:w-28 sm:py-2 sm:text-base" placeholder="0" required>
+                                        <span class="shrink-0 bg-slate-100 px-4 py-3 text-sm font-medium text-slate-600 sm:px-3 sm:py-2" x-text="item.unit || ''"></span>
                                     </div>
-                                    <button type="button" @click="removeItem(item.id)" class="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="{{ __('Remove') }}">
+                                    <button type="button" @click="removeItem(item.id)" class="hidden rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:block" title="{{ __('Remove') }}">
                                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                                     </button>
                                 </div>
@@ -137,24 +148,24 @@
                     </section>
 
                     <!-- 3. Cutting -->
-                    <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                        <div class="mb-5 flex items-center gap-3">
-                            <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-800 text-sm font-bold text-white">3</span>
+                    <section class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+                        <div class="mb-4 flex items-center gap-3 sm:mb-5">
+                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-800 text-sm font-bold text-white">3</span>
                             <div>
                                 <h3 class="font-semibold text-slate-800">{{ __('How many pieces were cut?') }}</h3>
                                 <p class="text-xs text-slate-500">{{ __('Sewing, finishing and blister are entered later on the production page.') }}</p>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-end gap-6">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-6">
                             <div>
                                 <div class="flex items-center overflow-hidden rounded-xl ring-1 ring-slate-300 focus-within:ring-2 focus-within:ring-accent-500">
-                                    <input id="cut_quantity" name="cut_quantity" type="number" step="1" min="1" x-model.number="cut" required
-                                           class="w-40 border-0 py-3 text-right text-2xl font-bold text-slate-800 focus:ring-0" placeholder="0">
-                                    <span class="bg-slate-100 px-4 py-4 text-sm font-semibold text-slate-600">{{ __('pcs') }}</span>
+                                    <input id="cut_quantity" name="cut_quantity" type="number" step="1" min="1" x-model.number="cut" required inputmode="numeric"
+                                           class="w-full min-w-0 border-0 py-3 text-right text-2xl font-bold text-slate-800 focus:ring-0 sm:w-40" placeholder="0">
+                                    <span class="shrink-0 bg-slate-100 px-4 py-4 text-sm font-semibold text-slate-600">{{ __('pcs') }}</span>
                                 </div>
                                 <x-input-error class="mt-2" :messages="$errors->get('cut_quantity')" />
                             </div>
-                            <div class="flex-1 min-w-[12rem]">
+                            <div class="sm:flex-1 sm:min-w-[12rem]">
                                 <x-input-label for="note" :value="__('Note (optional)')" />
                                 <x-text-input id="note" name="note" type="text" class="mt-1 block w-full" :value="old('note')"
                                               placeholder="{{ __('e.g. cutting master, lot remarks') }}" />
@@ -205,6 +216,7 @@
                                     <dd class="font-semibold text-slate-800" x-text="(Number(items[0].quantity) / cut).toFixed(3) + ' ' + (items[0].unit || '')"></dd>
                                 </div>
                             </template>
+                            @can('production.approve')
                             <template x-if="cut > 0 && items.length">
                                 <div class="flex items-center justify-between gap-3 px-5 py-3">
                                     <dt class="text-slate-500">{{ __('Est. material cost / pc') }}</dt>
@@ -212,8 +224,9 @@
                                         x-text="(items.reduce((s, i) => s + (Number(i.quantity) || 0) * (itemOptions.find((o) => o.id === i.id)?.cost || 0), 0) / cut).toFixed(2)"></dd>
                                 </div>
                             </template>
+                            @endcan
                         </dl>
-                        <div class="border-t border-slate-100 p-5">
+                        <div class="border-t border-slate-100 p-5 {{ $appMode ? 'max-lg:hidden' : '' }}">
                             <button type="submit" :disabled="items.length === 0 || ! (cut > 0)"
                                     class="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
@@ -223,6 +236,25 @@
                         </div>
                     </div>
                 </aside>
+
+                @if ($appMode)
+                {{-- Phone app: the save action stays in reach, just above the bottom tabs. --}}
+                <div class="h-20 lg:hidden"></div>
+                <div class="fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden"
+                     style="bottom: calc(4rem + env(safe-area-inset-bottom))">
+                    <div class="mx-auto flex max-w-md items-center gap-3">
+                        <div class="min-w-0 flex-1 text-sm">
+                            <p class="font-bold text-brand-900" x-text="(Number(cut) || 0) + ' {{ __('pcs') }}'"></p>
+                            <p class="truncate text-xs text-slate-500"
+                               x-text="items.length ? items.length + ' {{ __('fabric') }}' + (itemName ? ', ' + itemName : '') : '{{ __('Add fabric and pieces cut') }}'"></p>
+                        </div>
+                        <button type="submit" :disabled="items.length === 0 || ! (cut > 0)"
+                                class="rounded-xl bg-brand-800 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40">
+                            {{ __('Create Production') }}
+                        </button>
+                    </div>
+                </div>
+                @endif
             </form>
         </div>
         </div>

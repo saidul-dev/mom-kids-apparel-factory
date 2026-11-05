@@ -13,6 +13,7 @@ use App\Models\Site;
 use App\Models\StockMovement;
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
@@ -114,6 +115,10 @@ class ProductionOrderController extends Controller implements HasMiddleware
         // searchable-select reads ->id / ->name, so hand it objects.
         $items = $this->stockItemOptions(null, false, 'finished_good')->map(fn ($o) => (object) $o);
         $fabricOptions = $site ? $this->stockItemOptions($site->id, true, 'raw_material') : collect();
+        // Fabric prices are for whoever sees production costs, not the floor.
+        if (! $request->user()->can('production.approve')) {
+            $fabricOptions = $fabricOptions->map(fn ($o) => Arr::except($o, ['cost', 'price']));
+        }
 
         return view('admin.production.create', compact('sites', 'site', 'items', 'fabricOptions'));
     }
