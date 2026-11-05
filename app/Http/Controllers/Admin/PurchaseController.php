@@ -37,7 +37,7 @@ class PurchaseController extends Controller implements HasMiddleware
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
         $suppliers = Party::where('is_supplier', true)->orderBy('name')->get(['id', 'name']);
-        $siteId = $request->filled('site_id') ? $request->integer('site_id') : null;
+        $siteId = $this->dutySiteId($request);
         $partyId = $request->filled('party_id') ? $request->integer('party_id') : null;
 
         $purchases = Purchase::with(['site', 'party', 'createdBy'])
@@ -55,7 +55,7 @@ class PurchaseController extends Controller implements HasMiddleware
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
         $suppliers = Party::where('is_supplier', true)->where('status', true)->orderBy('name')->get(['id', 'name']);
-        $site = $request->filled('site_id') ? Site::findOrFail($request->integer('site_id')) : null;
+        $site = Site::find($this->dutySiteId($request));
 
         $itemOptions = $site ? $this->stockItemOptions($site->id) : collect();
 

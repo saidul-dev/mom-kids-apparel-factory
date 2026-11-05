@@ -509,7 +509,7 @@
                     <!-- Site selector -->
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open"
-                            class="hidden sm:flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-brand-800 ring-1 ring-slate-200 hover:bg-slate-50">
+                            class="flex items-center gap-2 rounded-lg px-2.5 sm:px-3 py-2 text-sm font-medium text-brand-800 ring-1 ring-slate-200 hover:bg-slate-50">
                             <svg class="h-4 w-4 shrink-0 text-accent-600" fill="none" viewBox="0 0 24 24"
                                 stroke-width="1.8" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -517,7 +517,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                             </svg>
-                            <span>{{ Auth::user()->currentSite->name ?? __('All Sites') }}</span>
+                            <span class="max-w-[7rem] truncate sm:max-w-none">{{ Auth::user()->currentSite->name ?? __('All Sites') }}</span>
                             <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -528,7 +528,7 @@
                             class="absolute right-0 mt-2 w-56 rounded-xl bg-white py-1.5 shadow-lg ring-1 ring-slate-200"
                             style="display: none;">
                             <p class="px-4 pt-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                                {{ __('Current Site') }}</p>
+                                {{ __('Duty Site') }}</p>
                             @foreach ($siteSwitcherOptions as $site)
                             <form method="POST" action="{{ route('sites.switch') }}">
                                 @csrf

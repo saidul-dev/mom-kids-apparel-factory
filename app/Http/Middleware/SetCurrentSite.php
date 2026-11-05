@@ -10,8 +10,9 @@ use Symfony\Component\HttpFoundation\Response;
  * Resolves the authenticated user's Current Site for this request.
  *
  * - 1 assigned site  -> auto-selected, no picker shown.
- * - >1 assigned sites -> must have a valid selection in session, otherwise
- *   redirected to the site picker (see ERP Architecture Guideline v1.0).
+ * - >1 assigned sites -> must have picked a duty site in this session (so
+ *   once after every login), otherwise redirected to the site picker (see
+ *   ERP Architecture Guideline v1.0). The topbar switches it afterwards.
  * - 0 assigned sites  -> Admin/Super Admin default to "All Sites" (null);
  *   anyone else simply has no site context yet (nothing to enforce until
  *   a site-aware module needs one).
@@ -41,13 +42,15 @@ class SetCurrentSite
 
             session(['current_site_id' => $onlySiteId]);
         } elseif ($assignedSiteIds->count() > 1) {
-            $current = session('current_site_id', $user->current_site_id);
+            // Only this session's own pick counts — the site saved on the
+            // user from a previous login doesn't skip the picker.
+            $current = session('current_site_id');
+            $picked = session()->has('current_site_id')
+                && ($current === null ? $user->seesAllSites() : $assignedSiteIds->contains($current));
 
-            if (! $current || ! $assignedSiteIds->contains($current)) {
+            if (! $picked) {
                 return redirect()->route('sites.select');
             }
-
-            session(['current_site_id' => $current]);
         } elseif ($user->seesAllSites()) {
             session(['current_site_id' => session('current_site_id', $user->current_site_id)]);
         }

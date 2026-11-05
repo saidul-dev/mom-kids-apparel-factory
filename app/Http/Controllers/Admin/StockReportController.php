@@ -35,7 +35,7 @@ class StockReportController extends Controller implements HasMiddleware
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
-        $site = $request->filled('site_id') ? Site::findOrFail($request->integer('site_id')) : null;
+        $site = Site::find($this->dutySiteId($request));
         $availability = $request->get('availability') === 'out' ? 'out' : 'in';
 
         $products = null;

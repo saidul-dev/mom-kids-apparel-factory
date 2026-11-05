@@ -39,7 +39,7 @@ class SalesOrderController extends Controller implements HasMiddleware
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
         $customers = Party::where('is_customer', true)->orderBy('name')->get(['id', 'name']);
-        $siteId = $request->filled('site_id') ? $request->integer('site_id') : null;
+        $siteId = $this->dutySiteId($request);
         $partyId = $request->filled('party_id') ? $request->integer('party_id') : null;
         $status = $request->get('status');
 
@@ -59,7 +59,7 @@ class SalesOrderController extends Controller implements HasMiddleware
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
         $customers = Party::where('is_customer', true)->where('status', true)->orderBy('name')->get(['id', 'name']);
-        $site = $request->filled('site_id') ? Site::findOrFail($request->integer('site_id')) : null;
+        $site = Site::find($this->dutySiteId($request));
 
         // Every item is orderable (an order can be taken before production
         // finishes) — stock is only enforced on delivery.

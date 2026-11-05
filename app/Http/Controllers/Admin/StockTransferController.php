@@ -37,7 +37,7 @@ class StockTransferController extends Controller implements HasMiddleware
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
         $status = $request->get('status');
-        $siteId = $request->filled('site_id') ? $request->integer('site_id') : null;
+        $siteId = $this->dutySiteId($request);
 
         $transfers = StockTransfer::with(['fromSite', 'toSite', 'dispatchedBy', 'receivedBy'])
             ->when($siteId, fn ($q) => $q->where(function ($q) use ($siteId) {
@@ -60,7 +60,7 @@ class StockTransferController extends Controller implements HasMiddleware
     public function create(Request $request)
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
-        $fromSite = $request->filled('from_site_id') ? Site::findOrFail($request->integer('from_site_id')) : null;
+        $fromSite = Site::find($this->dutySiteId($request, 'from_site_id'));
         $toSite = $request->filled('to_site_id') ? Site::findOrFail($request->integer('to_site_id')) : null;
 
         $itemOptions = $fromSite ? $this->itemOptions($fromSite->id) : collect();

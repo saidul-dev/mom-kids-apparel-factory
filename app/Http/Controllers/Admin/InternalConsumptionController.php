@@ -34,7 +34,7 @@ class InternalConsumptionController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
-        $site = $request->filled('site_id') ? Site::findOrFail($request->integer('site_id')) : null;
+        $site = Site::find($this->dutySiteId($request));
 
         $items = collect();
         $product = null;

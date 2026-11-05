@@ -1,7 +1,7 @@
 <x-guest-layout>
     <div class="mb-5 text-center">
-        <h2 class="text-xl font-bold text-brand-900">{{ __('Select a Site') }}</h2>
-        <p class="mt-1 text-sm text-slate-500">{{ __("You're assigned to more than one site. Pick which one you're working from.") }}</p>
+        <h2 class="text-xl font-bold text-brand-900">{{ __('Select your Duty Site') }}</h2>
+        <p class="mt-1 text-sm text-slate-500">{{ __("You're assigned to more than one site. Pick where you're on duty — every site picker will start on it, and you can change it any time from the top bar.") }}</p>
     </div>
 
     <div class="space-y-2">

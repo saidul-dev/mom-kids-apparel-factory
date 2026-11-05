@@ -60,7 +60,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
-        $siteId = $request->filled('site_id') ? $request->integer('site_id') : null;
+        $siteId = $this->dutySiteId($request);
         $status = $request->get('status', 'in_progress');
         $search = trim((string) $request->get('q'));
 
@@ -132,7 +132,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
     public function create(Request $request)
     {
         $sites = Site::where('status', true)->orderBy('name')->get();
-        $site = $request->filled('site_id') ? Site::findOrFail($request->integer('site_id')) : null;
+        $site = Site::find($this->dutySiteId($request));
 
         // searchable-select reads ->id / ->name, so hand it objects.
         $items = $this->stockItemOptions(null, false, 'finished_good')->map(fn ($o) => (object) $o);
