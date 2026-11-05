@@ -46,5 +46,13 @@ class SiteSeeder extends Seeder
 
             $manager->update(['current_site_id' => $factory->id]);
         }
+
+        // The supervisor works the factory floor only.
+        $supervisor = User::where('email', 'supervisor@businesserp.test')->first();
+
+        if ($supervisor) {
+            $supervisor->sites()->syncWithoutDetaching([$factory->id => ['is_default' => true]]);
+            $supervisor->update(['current_site_id' => $factory->id]);
+        }
     }
 }

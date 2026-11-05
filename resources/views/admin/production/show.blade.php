@@ -62,7 +62,7 @@
                     <span class="block text-xs text-brand-200">{{ __('finished') }}</span>
                 </div>
                 @if ($order->isOpen())
-                    @can('inventory.approve')
+                    @can('production.approve')
                     <form method="POST" action="{{ route('production-orders.complete', $order) }}"
                           onsubmit="return confirm('{{ $inProcess > 0
                               ? __(':n pcs are still unfinished — completing writes their cost off as wastage. Continue?', ['n' => $qty($inProcess)])
@@ -236,7 +236,7 @@
         @endif
 
         @if ($order->isOpen())
-        @can('inventory.create')
+        @can('production.create')
         <form method="POST" action="{{ route('production-orders.outside-work.store', $order) }}"
               x-data="{
                   qty: @js($owOld ? old('quantity') : ''),
@@ -312,7 +312,7 @@
     @endif
 
     @if ($order->isOpen())
-    @can('inventory.create')
+    @can('production.create')
     <!-- Quick update -->
     <div class="mb-4">
         <h3 class="mb-3 text-base font-semibold text-slate-800">{{ __('Update Progress') }}</h3>

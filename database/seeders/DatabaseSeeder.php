@@ -45,6 +45,11 @@ class DatabaseSeeder extends Seeder
         )->syncRoles('Manager');
 
         User::firstOrCreate(
+            ['email' => 'supervisor@businesserp.test'],
+            ['name' => 'Production Supervisor', 'password' => 'password']
+        )->syncRoles('Production Supervisor');
+
+        User::firstOrCreate(
             ['email' => 'hr@businesserp.test'],
             ['name' => 'HR Executive', 'password' => 'password']
         )->syncRoles('HR');

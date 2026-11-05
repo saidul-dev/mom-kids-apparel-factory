@@ -13,7 +13,7 @@ class RolePermissionSeeder extends Seeder
      * Canonical display order for role lists (Roles & Permissions page,
      * the Users form role picker). Not creation order — just presentation.
      */
-    public const ROLE_ORDER = ['Super Admin', 'Admin', 'Manager', 'HR', 'Accountant', 'Employee'];
+    public const ROLE_ORDER = ['Super Admin', 'Admin', 'Manager', 'Production Supervisor', 'HR', 'Accountant', 'Employee'];
 
     /**
      * Base modules (README §3) and the actions available on each.
@@ -27,6 +27,11 @@ class RolePermissionSeeder extends Seeder
         'projects'  => ['view', 'create', 'edit', 'delete'],
         'tasks'     => ['view', 'create', 'edit', 'delete'],
         'hrm'       => ['view', 'create', 'edit', 'delete', 'approve'],
+        // Employee records only (profile, documents) — narrower than hrm.*,
+        // which also covers salary, payroll, piece rates and login access.
+        'employees' => ['view', 'create', 'edit'],
+        // Production lots and stage entries; approve = complete a lot.
+        'production' => ['view', 'create', 'approve'],
         'reports'   => ['view'],
         'website'   => ['view', 'delete'],
         'settings'  => ['view', 'edit'],
@@ -57,6 +62,7 @@ class RolePermissionSeeder extends Seeder
 
         Role::findOrCreate('Manager')->syncPermissions([
             'inventory.view', 'inventory.create', 'inventory.edit', 'inventory.approve',
+            'production.view', 'production.create', 'production.approve',
             'parties.view', 'parties.create', 'parties.edit',
             'sales.view', 'sales.create', 'sales.edit', 'sales.approve',
             'projects.view', 'projects.create', 'projects.edit',
@@ -68,8 +74,18 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
         ]);
 
+        // Factory floor: adds and updates employees' basic records and
+        // records production (cutting, stage entries, who did the pieces).
+        // No salary/payroll/piece rates, login access, purchases or stock,
+        // and can't complete a lot (that writes off wastage).
+        Role::findOrCreate('Production Supervisor')->syncPermissions([
+            'employees.view', 'employees.create', 'employees.edit',
+            'production.view', 'production.create',
+        ]);
+
         Role::findOrCreate('HR')->syncPermissions([
             'hrm.view', 'hrm.create', 'hrm.edit', 'hrm.approve',
+            'employees.view', 'employees.create', 'employees.edit',
             'projects.view', 'projects.create', 'projects.edit',
             'tasks.view', 'tasks.create', 'tasks.edit',
             'parties.view',

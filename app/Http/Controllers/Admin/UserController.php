@@ -21,7 +21,7 @@ class UserController extends Controller implements HasMiddleware
     /**
      * Display order for role lists — not creation order, just presentation.
      */
-    protected const ROLE_ORDER = ['Super Admin', 'Admin', 'Manager', 'HR', 'Accountant', 'Employee'];
+    protected const ROLE_ORDER = ['Super Admin', 'Admin', 'Manager', 'Production Supervisor', 'HR', 'Accountant', 'Employee'];
 
     public static function middleware(): array
     {

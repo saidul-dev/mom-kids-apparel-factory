@@ -44,7 +44,10 @@
          salary) with their own methods, and account access/pay setup are
          distinct actions from editing the employee's profile fields. Laid
          out in the same full-width grid as the form above it (instead of a
-         narrow floating box) so the page reads as one continuous layout. --}}
+         narrow floating box) so the page reads as one continuous layout.
+         HR-only: login access and pay aren't part of an employee's basic
+         record (employees.edit). --}}
+    @can('hrm.edit')
     <div class="mt-8 border-t border-slate-200 pt-6">
         <h3 class="text-sm font-bold uppercase tracking-wide text-slate-400">{{ __('Account & System Access') }}</h3>
 
@@ -132,6 +135,7 @@
             @endcan
         </div>
     </div>
+    @endcan
 
     @can('hrm.edit')
     <x-modal name="salary-structure" max-width="lg" :show="$errors->any()">

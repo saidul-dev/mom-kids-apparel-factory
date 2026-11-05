@@ -6,7 +6,7 @@
                 <h2 class="text-2xl font-bold text-brand-900">{{ __('Employees') }}</h2>
                 <p class="text-sm text-slate-500 mt-0.5">{{ __('Staff profiles, documents and login access') }}</p>
             </div>
-            @can('hrm.create')
+            @can('employees.create')
             <a href="{{ route('employees.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus:ring-2 focus:ring-accent-500 focus:ring-offset-2">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                 {{ __('Add Employee') }}
@@ -110,7 +110,7 @@
                     </td>
                     <td class="px-5 py-3">
                         <div class="flex items-center justify-end gap-1">
-                            @can('hrm.edit')
+                            @can('employees.edit')
                             <a href="{{ route('employees.edit', $employee) }}" title="{{ __('Edit') }}"
                                class="rounded-lg p-2 text-slate-400 hover:bg-brand-50 hover:text-brand-700">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>

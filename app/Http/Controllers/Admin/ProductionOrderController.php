@@ -46,9 +46,9 @@ class ProductionOrderController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:inventory.view', only: ['index', 'show']),
-            new Middleware('permission:inventory.create', only: ['create', 'store', 'storeStage', 'storeOutsideWork']),
-            new Middleware('permission:inventory.approve', only: ['complete']),
+            new Middleware('permission:production.view', only: ['index', 'show']),
+            new Middleware('permission:production.create', only: ['create', 'store', 'storeStage', 'storeOutsideWork']),
+            new Middleware('permission:production.approve', only: ['complete']),
         ];
     }
 

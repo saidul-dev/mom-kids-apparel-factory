@@ -23,9 +23,11 @@ class EmployeeController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:hrm.view', only: ['index']),
-            new Middleware('permission:hrm.create', only: ['create', 'store']),
-            new Middleware('permission:hrm.edit', only: ['edit', 'update', 'toggleLogin', 'destroyAttachment']),
+            // Basic records use employees.*; turning a login on stays HR's.
+            new Middleware('permission:employees.view', only: ['index']),
+            new Middleware('permission:employees.create', only: ['create', 'store']),
+            new Middleware('permission:employees.edit', only: ['edit', 'update', 'destroyAttachment']),
+            new Middleware('permission:hrm.edit', only: ['toggleLogin']),
             new Middleware('permission:hrm.delete', only: ['destroy']),
         ];
     }

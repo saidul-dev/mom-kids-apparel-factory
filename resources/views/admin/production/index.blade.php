@@ -21,7 +21,7 @@
                 <h2 class="text-2xl font-bold text-brand-900">{{ __('Production Dashboard') }}</h2>
                 <p class="text-sm text-slate-500 mt-0.5">{{ __('Cutting → Sewing → Finishing → Blister / Poly → Finished stock') }}</p>
             </div>
-            @can('inventory.create')
+            @can('production.create')
             <a href="{{ route('production-orders.create') }}"
                class="inline-flex items-center gap-2 rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>

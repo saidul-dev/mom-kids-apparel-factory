@@ -9,6 +9,15 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @can('production.create')
+                <a href="{{ route('production-orders.index') }}" class="inline-flex items-center gap-2 rounded-lg bg-white px-3 sm:px-4 py-2 text-sm font-semibold text-brand-800 ring-1 ring-slate-200 hover:bg-slate-50 whitespace-nowrap">
+                    {{ __('Production') }}
+                </a>
+                <a href="{{ route('production-orders.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-brand-800 px-3 sm:px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 whitespace-nowrap">
+                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    {{ __('New Production') }}
+                </a>
+                @endcan
                 @can('accounts.create')
                 <a href="{{ route('collections.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-brand-800 px-3 sm:px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 whitespace-nowrap">
                     <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
@@ -23,10 +32,13 @@
     </x-slot>
 
     @php
-        $stats = [
-            ['label' => __("Today's Collection"), 'value' => number_format($todayCollection, 2), 'icon' => 'collection'],
-            ['label' => __("Today's Expense"), 'value' => number_format($todayExpense, 2), 'icon' => 'expense'],
-            ['label' => __('Total Receivable (Due)'), 'value' => number_format($totalReceivable, 2), 'icon' => 'due'],
+        // Collections, expenses and customer dues are for those who handle
+        // money or sales — floor roles (supervisor, HR, employee) see stock only.
+        $seesMoney = Auth::user()->canany(['accounts.view', 'sales.view']);
+        $stats = array_values(array_filter([
+            $seesMoney ? ['label' => __("Today's Collection"), 'value' => number_format($todayCollection, 2), 'icon' => 'collection'] : null,
+            $seesMoney ? ['label' => __("Today's Expense"), 'value' => number_format($todayExpense, 2), 'icon' => 'expense'] : null,
+            $seesMoney ? ['label' => __('Total Receivable (Due)'), 'value' => number_format($totalReceivable, 2), 'icon' => 'due'] : null,
             [
                 'label' => __('Low Stock Items'),
                 'value' => (string) $lowStockCount,
@@ -34,7 +46,7 @@
                 'alert' => $criticalCount > 0,
                 'icon' => 'stock',
             ],
-        ];
+        ]));
     @endphp
 
     <div class="space-y-6">
@@ -67,6 +79,7 @@
             @endforeach
         </div>
 
+        @if ($seesMoney)
         <!-- Charts row -->
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div class="xl:col-span-2 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
@@ -98,8 +111,11 @@
             </div>
         </div>
 
+        @endif
+
         <!-- Tables row -->
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            @if ($seesMoney)
             <!-- Recent collections -->
             <div class="xl:col-span-2 rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
                 <div class="flex items-center justify-between px-5 pt-5 pb-3">
@@ -135,6 +151,7 @@
                     </table>
                 </div>
             </div>
+            @endif
 
             <!-- Low stock alerts -->
             <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
@@ -170,6 +187,7 @@
         </div>
     </div>
 
+    @if ($seesMoney)
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const brand = { deep: '#0b2a6b', mid: '#1857c4', cyan: '#06b6d4', cyanSoft: 'rgba(6, 182, 212, .15)', blueSoft: 'rgba(11, 42, 107, .08)' };
@@ -206,4 +224,5 @@
             });
         });
     </script>
+    @endif
 </x-app-layout>

@@ -127,7 +127,7 @@
                     </x-sidebar-dropdown>
                     @endcan
 
-                    @can('inventory.view')
+                    @can('production.view')
                     <x-sidebar-link :href="route('production-orders.index')" :active="request()->routeIs('production-orders.*')"
                         :title="__('Production')">
                         <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
@@ -251,7 +251,7 @@
                     </x-sidebar-dropdown>
                     @endcan
 
-                    @can('hrm.view')
+                    @canany(['hrm.view', 'employees.view'])
                     <x-sidebar-dropdown :title="__('HRM')"
                         :active="request()->routeIs('employees.*', 'departments.*', 'designations.*', 'attendance.*', 'leave-types.*', 'leave-requests.*', 'piece-rates.*', 'piece-works.*', 'payroll-runs.*')">
                         <x-slot name="icon">
@@ -262,9 +262,12 @@
                             </svg>
                         </x-slot>
 
+                        @can('employees.view')
                         <x-sidebar-sublink :href="route('employees.index')" :active="request()->routeIs('employees.*')">
                             {{ __('Employees') }}
                         </x-sidebar-sublink>
+                        @endcan
+                        @can('hrm.view')
                         <x-sidebar-sublink :href="route('departments.index')" :active="request()->routeIs('departments.*')">
                             {{ __('Departments') }}
                         </x-sidebar-sublink>
@@ -292,8 +295,9 @@
                         <x-sidebar-sublink :href="route('payroll-runs.index')" :active="request()->routeIs('payroll-runs.*')">
                             {{ __('Payroll Runs') }}
                         </x-sidebar-sublink>
+                        @endcan
                     </x-sidebar-dropdown>
-                    @endcan
+                    @endcanany
 
                     @if (auth()->user()->employee)
                     <x-sidebar-link :href="route('attendance.my')" :title="__('My Attendance')"
