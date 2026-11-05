@@ -253,7 +253,7 @@
 
                     @can('hrm.view')
                     <x-sidebar-dropdown :title="__('HRM')"
-                        :active="request()->routeIs('employees.*', 'departments.*', 'designations.*', 'attendance.*', 'leave-types.*', 'leave-requests.*', 'payroll-runs.*')">
+                        :active="request()->routeIs('employees.*', 'departments.*', 'designations.*', 'attendance.*', 'leave-types.*', 'leave-requests.*', 'piece-rates.*', 'piece-works.*', 'payroll-runs.*')">
                         <x-slot name="icon">
                             <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
                                 stroke="currentColor">
@@ -282,6 +282,12 @@
                         </x-sidebar-sublink>
                         <x-sidebar-sublink :href="route('leave-requests.index')" :active="request()->routeIs('leave-requests.*')">
                             {{ __('Leave Requests') }}
+                        </x-sidebar-sublink>
+                        <x-sidebar-sublink :href="route('piece-rates.index')" :active="request()->routeIs('piece-rates.*')">
+                            {{ __('Piece Rates') }}
+                        </x-sidebar-sublink>
+                        <x-sidebar-sublink :href="route('piece-works.index')" :active="request()->routeIs('piece-works.*')">
+                            {{ __('Piece Work') }}
                         </x-sidebar-sublink>
                         <x-sidebar-sublink :href="route('payroll-runs.index')" :active="request()->routeIs('payroll-runs.*')">
                             {{ __('Payroll Runs') }}

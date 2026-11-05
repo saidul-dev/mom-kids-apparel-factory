@@ -55,7 +55,21 @@
         <div class="mt-6 text-sm">
             <table class="w-full">
                 <tbody class="divide-y divide-slate-100">
-                    @if ($item->mode === 'flat')
+                    @if ($item->mode === 'piece_rate')
+                    <tr class="text-[11px] uppercase tracking-wide text-slate-400">
+                        <td class="py-1.5">{{ __('Piece Work') }}</td>
+                        <td class="py-1.5 text-right">{{ __('Pieces × Rate') }}</td>
+                    </tr>
+                    @foreach ($pieceLines as $line)
+                    <tr>
+                        <td class="py-1.5 text-slate-600">{{ $line->item }} — {{ __($line->stage) }}</td>
+                        <td class="py-1.5 text-right text-slate-800">
+                            <span class="text-xs text-slate-500">{{ rtrim(rtrim(number_format($line->pcs, 2), '0'), '.') }} × {{ number_format($line->rate, 2) }} =</span>
+                            {{ number_format($line->amount, 2) }}
+                        </td>
+                    </tr>
+                    @endforeach
+                    @elseif ($item->mode === 'flat')
                     <tr><td class="py-1.5 text-slate-600">{{ __('Flat Salary') }}</td><td class="py-1.5 text-right text-slate-800">{{ number_format($item->flat_amount, 2) }}</td></tr>
                     @else
                     <tr><td class="py-1.5 text-slate-600">{{ __('Basic') }}</td><td class="py-1.5 text-right text-slate-800">{{ number_format($item->basic, 2) }}</td></tr>

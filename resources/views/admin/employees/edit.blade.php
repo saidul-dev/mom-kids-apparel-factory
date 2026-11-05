@@ -115,7 +115,9 @@
                     <h4 class="font-bold text-brand-900">{{ __('Salary Structure') }}</h4>
                 </div>
                 <p class="mt-1 text-xs text-slate-400">
-                    @if ($employee->salaryStructure)
+                    @if ($employee->salaryStructure?->mode === 'piece_rate')
+                        {{ __('Piece rate — paid for the pieces done in production each month') }}
+                    @elseif ($employee->salaryStructure)
                         {{ $employee->salaryStructure->mode === 'flat' ? __('Flat amount') : __('Component-based') }} —
                         {{ number_format($employee->salaryStructure->grossAmount(), 2) }} / {{ __('month') }}
                     @else
@@ -143,7 +145,7 @@
 
                 <div>
                     <x-input-label :value="__('Mode')" />
-                    <div class="mt-1 flex gap-4">
+                    <div class="mt-1 flex flex-wrap gap-x-4 gap-y-2">
                         <label class="flex items-center gap-2 text-sm">
                             <input type="radio" name="mode" value="flat" x-model="mode" class="border-slate-300 text-accent-600 focus:ring-accent-500">
                             {{ __('Flat monthly amount') }}
@@ -151,6 +153,10 @@
                         <label class="flex items-center gap-2 text-sm">
                             <input type="radio" name="mode" value="components" x-model="mode" class="border-slate-300 text-accent-600 focus:ring-accent-500">
                             {{ __('Basic + House Rent + Medical + Conveyance') }}
+                        </label>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="radio" name="mode" value="piece_rate" x-model="mode" class="border-slate-300 text-accent-600 focus:ring-accent-500">
+                            {{ __('Piece rate (production)') }}
                         </label>
                     </div>
                     <x-input-error class="mt-2" :messages="$errors->get('mode')" />
@@ -162,6 +168,10 @@
                                   :value="old('flat_amount', $employee->salaryStructure->flat_amount ?? '0')" />
                     <x-input-error class="mt-2" :messages="$errors->get('flat_amount')" />
                 </div>
+
+                <p x-show="mode === 'piece_rate'" x-cloak class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
+                    {{ __('No fixed salary. The month\'s pay is the pieces this worker is given on production entries × the item\'s rate (HRM → Piece Rates).') }}
+                </p>
 
                 <div x-show="mode === 'components'" x-cloak class="grid grid-cols-2 gap-4">
                     <div>

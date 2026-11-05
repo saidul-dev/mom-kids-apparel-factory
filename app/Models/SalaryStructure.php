@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SalaryStructure extends Model
 {
-    public const MODES = ['flat', 'components'];
+    /**
+     * piece_rate: no fixed pay — the month's production piece work
+     * (pieces × PieceRate) is the salary.
+     */
+    public const MODES = ['flat', 'components', 'piece_rate'];
 
     protected $fillable = [
         'employee_id',
@@ -38,6 +42,10 @@ class SalaryStructure extends Model
     {
         if ($this->mode === 'flat') {
             return (float) $this->flat_amount;
+        }
+
+        if ($this->mode === 'piece_rate') {
+            return 0;
         }
 
         return (float) $this->basic + (float) $this->house_rent + (float) $this->medical + (float) $this->conveyance;

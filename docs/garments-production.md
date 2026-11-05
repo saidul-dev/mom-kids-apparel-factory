@@ -103,6 +103,20 @@ later from Accounts → Payments, like a purchase. Being in WIP, it is
 spread over the pieces packed after it is entered — enter it before the
 lot is blistered so every piece carries it.
 
+**Piece-rate workers.** An employee whose Salary Structure mode is
+`piece_rate` has no fixed pay. HRM → Piece Rates (`piece-rates.*`,
+`hrm.view`/`hrm.edit`) holds a rate per finished item for Sewing,
+Finishing and Blister/Poly (`PieceRate::STAGES`); a size paid differently
+is set up as its own item. A Sewing/Finishing/Blister entry on the
+production page can be split between piece-rate workers at the lot's
+Site — the entry's pieces are then their total, and each gets a
+`production_piece_works` row with the rate copied in (a later rate change
+doesn't touch past work). HRM → Piece Work (`piece-works.index`) lists it
+by day or range. The monthly Payroll Run pays them the month's pieces ×
+rate with no absence deduction (no line if they did no piece work), and
+the payslip breaks it down by item and stage. Wages go to Salary Expense
+as usual — they are not added to the lot's cost.
+
 **Blister / Poly** is the only stage that touches finished stock: it posts a
 `production` in movement of the lot's item at the Site. Cost per piece =
 the lot's WIP value ÷ pieces still in WIP (cut but not yet packed), so

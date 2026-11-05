@@ -24,6 +24,8 @@ use App\Http\Controllers\Admin\LedgerAccountController;
 use App\Http\Controllers\Admin\MilestoneController;
 use App\Http\Controllers\Admin\PartyController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\PieceRateController;
+use App\Http\Controllers\Admin\PieceWorkController;
 use App\Http\Controllers\Admin\ProductionOrderController;
 use App\Http\Controllers\Admin\PayrollRunController;
 use App\Http\Controllers\Admin\ProductController;
@@ -161,6 +163,9 @@ Route::prefix('admin')->group(function () {
         Route::patch('/leave-requests/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leave-requests.approve');
         Route::patch('/leave-requests/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leave-requests.reject');
 
+        Route::get('/piece-rates', [PieceRateController::class, 'index'])->name('piece-rates.index');
+        Route::put('/piece-rates', [PieceRateController::class, 'update'])->name('piece-rates.update');
+        Route::get('/piece-works', [PieceWorkController::class, 'index'])->name('piece-works.index');
         Route::resource('payroll-runs', PayrollRunController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::patch('/payroll-runs/{payrollRun}/approve', [PayrollRunController::class, 'approve'])->name('payroll-runs.approve');
         Route::patch('/payroll-runs/{payrollRun}/items/{item}', [PayrollRunController::class, 'updateItem'])->name('payroll-runs.items.update');

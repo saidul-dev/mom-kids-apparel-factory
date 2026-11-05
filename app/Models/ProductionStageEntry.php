@@ -34,6 +34,11 @@ class ProductionStageEntry extends Model
         return $this->hasMany(ProductionMaterial::class);
     }
 
+    public function pieceWorks(): HasMany
+    {
+        return $this->hasMany(ProductionPieceWork::class);
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

@@ -320,9 +320,18 @@
             @foreach ($quick as $stage => [$label, $from])
             @php
                 $waiting = (float) $available[$stage];
+                $rate = $pieceRates[$stage] ?? null;
+                $oldWorkers = old('stage') === $stage ? array_values(old('workers', [])) : [];
             @endphp
             <form method="POST" action="{{ route('production-orders.stages.store', $order) }}"
-                  x-data="{ qty: @js(old('stage') === $stage ? old('quantity') : '') }"
+                  x-data="{
+                      qty: @js(old('stage') === $stage ? old('quantity') : ''),
+                      rate: {{ $rate !== null ? (float) $rate : 'null' }},
+                      rows: @js($oldWorkers),
+                      get split() { return this.rows.length > 0 },
+                      get earned() { return this.rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0) * (this.rate || 0) },
+                  }"
+                  x-effect="if (split) qty = rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0) || ''"
                   class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 {{ $waiting <= 0 ? 'opacity-60' : '' }}">
                 @csrf
                 <input type="hidden" name="stage" value="{{ $stage }}">
@@ -341,14 +350,65 @@
                 <div class="mt-4 flex items-center gap-2">
                     <div class="flex flex-1 items-center overflow-hidden rounded-lg ring-1 ring-slate-300 focus-within:ring-2 focus-within:ring-accent-500">
                         <input type="number" name="quantity" step="1" min="1" max="{{ $waiting }}" x-model="qty" required @disabled($waiting <= 0)
+                               :readonly="split" :class="split && 'bg-slate-50 text-slate-500'"
                                class="w-full border-0 text-right text-lg font-bold focus:ring-0" placeholder="0">
                         <span class="bg-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-500">{{ __('pcs') }}</span>
                     </div>
-                    <button type="button" @click="qty = {{ $waiting }}" @disabled($waiting <= 0)
+                    <button type="button" x-show="!split" @click="qty = {{ $waiting }}" @disabled($waiting <= 0)
                             class="rounded-lg px-3 py-2.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed">{{ __('All') }}</button>
                 </div>
                 @if (old('stage') === $stage)
                 <x-input-error class="mt-2" :messages="$errors->get('quantity')" />
+                @endif
+
+                {{-- Piece-rate workers: their pieces make up the entry and earn pieces × rate. --}}
+                @if ($workers->isNotEmpty() && $waiting > 0)
+                <div class="mt-3 rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-200">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-semibold text-slate-600">
+                            {{ __('Workers') }}
+                            @if ($rate !== null)
+                            <span class="font-normal text-slate-400">· {{ number_format($rate, 2) }} / {{ __('pc') }}</span>
+                            @endif
+                        </span>
+                        @if ($rate !== null)
+                        <button type="button" @click="rows.push({ employee_id: '', quantity: '' })"
+                                class="text-xs font-semibold text-accent-700 hover:text-accent-800">+ {{ __('Worker') }}</button>
+                        @endif
+                    </div>
+                    @if ($rate === null)
+                    <p class="mt-1 text-xs text-slate-400">
+                        {{ __('No piece rate set for this item at this stage.') }}
+                        @can('hrm.edit')<a href="{{ route('piece-rates.index') }}" class="font-semibold text-accent-700 hover:underline">{{ __('Set rate') }}</a>@endcan
+                    </p>
+                    @endif
+                    <template x-for="(row, i) in rows" :key="i">
+                        <div class="mt-2 flex items-center gap-1.5">
+                            <select :name="'workers[' + i + '][employee_id]'" x-model="row.employee_id" required
+                                    class="min-w-0 flex-1 rounded-lg border-slate-300 py-1.5 text-xs focus:border-accent-500 focus:ring-accent-500">
+                                <option value="">{{ __('Select…') }}</option>
+                                @foreach ($workers as $worker)
+                                <option value="{{ $worker->id }}">{{ $worker->name }}</option>
+                                @endforeach
+                            </select>
+                            <input type="number" :name="'workers[' + i + '][quantity]'" x-model="row.quantity" step="1" min="1" required
+                                   class="w-20 rounded-lg border-slate-300 py-1.5 text-right text-xs focus:border-accent-500 focus:ring-accent-500" placeholder="{{ __('pcs') }}">
+                            <button type="button" @click="rows.splice(i, 1)" class="text-slate-400 hover:text-rose-600">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                    </template>
+                    <p x-show="split" x-cloak class="mt-2 text-right text-xs text-slate-500">
+                        {{ __('Earned') }}: <b class="text-slate-700" x-text="earned.toFixed(2)"></b>
+                    </p>
+                    @if (old('stage') === $stage)
+                    @foreach ($errors->getMessages() as $key => $messages)
+                        @if (str_starts_with($key, 'workers'))
+                        <x-input-error class="mt-2" :messages="$messages" />
+                        @endif
+                    @endforeach
+                    @endif
+                </div>
                 @endif
 
                 <div class="mt-3 flex items-center gap-2">
@@ -460,6 +520,15 @@
                     @foreach ($entry->materials as $m)
                     <span class="inline-flex rounded-md bg-slate-50 px-2 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200">
                         {{ $m->product->name }}: {{ $qty($m->quantity) }} {{ $m->product->stockUnit?->short_name }}
+                    </span>
+                    @endforeach
+                </div>
+                @endif
+                @if ($entry->pieceWorks->isNotEmpty())
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
+                    @foreach ($entry->pieceWorks as $work)
+                    <span class="inline-flex rounded-md bg-sky-50 px-2 py-0.5 text-xs text-sky-700 ring-1 ring-sky-200">
+                        {{ $work->employee->name }}: {{ $qty($work->quantity) }} {{ __('pcs') }} · {{ number_format($work->amount, 2) }}
                     </span>
                     @endforeach
                 </div>

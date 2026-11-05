@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Concerns\ResolvesStockItems;
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\Party;
+use App\Models\PieceRate;
 use App\Models\ProductionOrder;
 use App\Models\ProductionStageEntry;
 use App\Models\Site;
@@ -197,6 +199,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
             'stageEntries.createdBy',
             'stageEntries.materials.product.stockUnit',
             'stageEntries.materials.productVariant.attributeValues',
+            'stageEntries.pieceWorks.employee',
             'outsideWorks' => fn ($q) => $q->orderByDesc('entry_date')->orderByDesc('id'),
             'outsideWorks.party',
         ]);
@@ -221,6 +224,10 @@ class ProductionOrderController extends Controller implements HasMiddleware
         $vendors = $productionOrder->isOpen()
             ? Party::where('is_supplier', true)->where('status', true)->orderBy('name')->get(['id', 'name'])
             : collect();
+        $workers = $productionOrder->isOpen()
+            ? Employee::pieceRateWorkers($productionOrder->site_id)->orderBy('name')->get(['id', 'name'])
+            : collect();
+        $pieceRates = PieceRate::where('product_id', $productionOrder->product_id)->pluck('rate', 'stage');
 
         return view('admin.production.show', [
             'order' => $productionOrder,
@@ -235,6 +242,8 @@ class ProductionOrderController extends Controller implements HasMiddleware
             'outsideCost' => $outsideCost,
             'materialOptions' => $materialOptions,
             'vendors' => $vendors,
+            'workers' => $workers,
+            'pieceRates' => $pieceRates,
         ]);
     }
 
@@ -315,16 +324,23 @@ class ProductionOrderController extends Controller implements HasMiddleware
 
         $validated = $request->validate([
             'stage' => ['required', Rule::in(array_keys(ProductionOrder::STAGES))],
-            'quantity' => ['required', 'numeric', 'min:0.0001'],
+            'quantity' => ['required_without:workers', 'nullable', 'numeric', 'min:0.0001'],
             'entry_date' => ['required', 'date'],
             'note' => ['nullable', 'string', 'max:1000'],
             'materials' => ['nullable', 'array'],
             'materials.*.item' => ['required', 'string', 'distinct'],
             'materials.*.quantity' => ['required', 'numeric', 'min:0.0001'],
+            'workers' => ['nullable', 'array'],
+            'workers.*.employee_id' => ['required', 'integer', 'distinct', 'exists:employees,id'],
+            'workers.*.quantity' => ['required', 'numeric', 'min:1'],
+        ], [
+            'workers.*.employee_id.distinct' => 'A worker is listed twice.',
         ]);
 
         $stage = $validated['stage'];
-        $quantity = (float) $validated['quantity'];
+        $workers = $this->resolveWorkers($validated['workers'] ?? [], $productionOrder, $stage);
+        // Split between workers, the entry is exactly what they did.
+        $quantity = $workers ? (float) array_sum(array_column($workers, 'quantity')) : (float) $validated['quantity'];
         $available = $productionOrder->availableFor($stage);
 
         if ($available !== null && $quantity > $available) {
@@ -339,8 +355,21 @@ class ProductionOrderController extends Controller implements HasMiddleware
 
         $materials = $this->resolveMaterials($validated['materials'] ?? [], $productionOrder->site, 'materials');
 
-        DB::transaction(function () use ($productionOrder, $validated, $stage, $quantity, $materials) {
-            $this->recordStage($productionOrder, $stage, $quantity, $validated['entry_date'], $validated['note'] ?? null, $materials);
+        DB::transaction(function () use ($productionOrder, $validated, $stage, $quantity, $materials, $workers) {
+            $entry = $this->recordStage($productionOrder, $stage, $quantity, $validated['entry_date'], $validated['note'] ?? null, $materials);
+
+            foreach ($workers as $w) {
+                $entry->pieceWorks()->create([
+                    'production_order_id' => $productionOrder->id,
+                    'employee_id' => $w['employee']->id,
+                    'stage' => $stage,
+                    'quantity' => $w['quantity'],
+                    'rate' => $w['rate'],
+                    'amount' => round($w['quantity'] * $w['rate'], 2),
+                    'entry_date' => $validated['entry_date'],
+                    'created_by' => Auth::id(),
+                ]);
+            }
         });
 
         return back()->with('success', rtrim(rtrim(number_format($quantity, 4), '0'), '.')
@@ -385,6 +414,39 @@ class ProductionOrderController extends Controller implements HasMiddleware
         });
 
         return back()->with('success', "Production {$productionOrder->production_no} completed.");
+    }
+
+    /**
+     * Check each worker is a piece-rate employee and the item has a rate
+     * for this stage, capturing that rate for the entry.
+     */
+    protected function resolveWorkers(array $rows, ProductionOrder $order, string $stage): array
+    {
+        if (! $rows) {
+            return [];
+        }
+
+        if (! in_array($stage, PieceRate::STAGES, true)) {
+            throw ValidationException::withMessages(['workers' => ProductionOrder::STAGES[$stage].' is not paid by the piece.']);
+        }
+
+        $rate = PieceRate::where('product_id', $order->product_id)->where('stage', $stage)->value('rate');
+        if ($rate === null) {
+            throw ValidationException::withMessages([
+                'workers' => "Set the piece rate for {$order->product->name} — ".ProductionOrder::STAGES[$stage].' first (HRM → Piece Rates).',
+            ]);
+        }
+
+        $employees = Employee::pieceRateWorkers()->whereIn('id', array_column($rows, 'employee_id'))->get()->keyBy('id');
+
+        return array_map(function ($row) use ($employees, $rate) {
+            $employee = $employees[$row['employee_id']] ?? null;
+            if (! $employee) {
+                throw ValidationException::withMessages(['workers' => 'Only active piece-rate employees can be given piece work.']);
+            }
+
+            return ['employee' => $employee, 'quantity' => (float) $row['quantity'], 'rate' => (float) $rate];
+        }, array_values($rows));
     }
 
     /**

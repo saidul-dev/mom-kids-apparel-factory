@@ -46,8 +46,18 @@
             <tbody class="divide-y divide-slate-100">
                 @forelse ($payrollRun->items as $item)
                 <tr class="hover:bg-slate-50">
-                    <td class="px-4 py-3 font-semibold text-slate-800">{{ $item->employee->name }}</td>
-                    <td class="px-4 py-3 text-right text-slate-600">{{ number_format($item->gross_amount, 2) }}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800">
+                        {{ $item->employee->name }}
+                        @if ($item->mode === 'piece_rate')
+                        <span class="block text-xs font-normal text-slate-400">{{ __('Piece rate') }}</span>
+                        @endif
+                    </td>
+                    <td class="px-4 py-3 text-right text-slate-600">
+                        {{ number_format($item->gross_amount, 2) }}
+                        @if ($item->mode === 'piece_rate')
+                        <span class="block text-xs text-slate-400">{{ rtrim(rtrim(number_format((float) $item->piece_quantity, 2), '0'), '.') }} {{ __('pcs') }}</span>
+                        @endif
+                    </td>
                     @if ($payrollRun->status === 'draft')
                     <td class="px-4 py-3 text-center">
                         <input form="item-form-{{ $item->id }}" type="number" step="0.5" min="0" name="absence_days" value="{{ $item->absence_days }}"

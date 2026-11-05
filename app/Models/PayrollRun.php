@@ -67,6 +67,10 @@ class PayrollRun extends Model
      * "entered, not rule-engine yet", so HR can edit every figure before
      * approving. Returns the names of employees skipped for having no
      * SalaryStructure yet.
+     *
+     * Piece-rate employees earn the month's production piece work (pieces
+     * × rate) instead of a fixed amount, with nothing deducted for absence;
+     * one with no piece work that month gets no line.
      */
     public function generateItems(): array
     {
@@ -89,6 +93,20 @@ class PayrollRun extends Model
             }
 
             $gross = $structure->grossAmount();
+            $pieceQuantity = null;
+
+            if ($structure->mode === 'piece_rate') {
+                $work = $this->pieceWorkFor($employee)
+                    ->selectRaw('COALESCE(SUM(quantity), 0) as pcs, COALESCE(SUM(amount), 0) as amount')
+                    ->first();
+
+                if ((float) $work->amount <= 0) {
+                    continue;
+                }
+
+                $gross = round((float) $work->amount, 2);
+                $pieceQuantity = (float) $work->pcs;
+            }
 
             $absenceDays = AttendanceLog::where('employee_id', $employee->id)
                 ->where('status', 'absent')
@@ -96,7 +114,7 @@ class PayrollRun extends Model
                 ->whereYear('date', $this->year)
                 ->count();
 
-            $perDayRate = $daysInMonth > 0 ? $gross / $daysInMonth : 0;
+            $perDayRate = $daysInMonth > 0 && $structure->mode !== 'piece_rate' ? $gross / $daysInMonth : 0;
             $absenceDeduction = round($perDayRate * $absenceDays, 2);
 
             $this->items()->create([
@@ -107,6 +125,7 @@ class PayrollRun extends Model
                 'house_rent' => $structure->house_rent,
                 'medical' => $structure->medical,
                 'conveyance' => $structure->conveyance,
+                'piece_quantity' => $pieceQuantity,
                 'gross_amount' => $gross,
                 'absence_days' => $absenceDays,
                 'absence_deduction' => $absenceDeduction,
@@ -118,6 +137,16 @@ class PayrollRun extends Model
         $this->update(['total_amount' => $this->items()->sum('net_amount')]);
 
         return $skipped;
+    }
+
+    /**
+     * The employee's production piece work in this run's month.
+     */
+    public function pieceWorkFor(Employee $employee)
+    {
+        return ProductionPieceWork::where('employee_id', $employee->id)
+            ->whereMonth('entry_date', $this->month)
+            ->whereYear('entry_date', $this->year);
     }
 
     /**

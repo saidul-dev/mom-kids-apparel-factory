@@ -95,6 +95,22 @@ class Employee extends Model
         return $this->hasMany(PayrollRunItem::class);
     }
 
+    public function pieceWorks(): HasMany
+    {
+        return $this->hasMany(ProductionPieceWork::class);
+    }
+
+    /**
+     * Active employees paid by the piece — the workers a production stage
+     * entry can be split between.
+     */
+    public function scopePieceRateWorkers($query, ?int $siteId = null)
+    {
+        return $query->where('employment_status', 'active')
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->whereHas('salaryStructure', fn ($q) => $q->where('mode', 'piece_rate'));
+    }
+
     /**
      * Three tiers, per docs/hrm-employee-management.md §1.5's RBAC list:
      * HR/Admin (hrm.edit) see everyone; a Manager (hrm.approve without

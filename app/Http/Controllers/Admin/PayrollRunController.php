@@ -144,6 +144,21 @@ class PayrollRunController extends Controller implements HasMiddleware
         $item->load(['employee', 'payrollRun.site', 'paidFromAccount']);
         $company = CompanySetting::current();
 
-        return view('admin.payroll-runs.payslip', compact('item', 'company'));
+        // Piece work behind a piece-rate payslip, one line per item, stage and rate.
+        $pieceLines = $item->mode !== 'piece_rate' ? collect() : $item->payrollRun->pieceWorkFor($item->employee)
+            ->with('productionOrder.product')
+            ->get()
+            ->groupBy(fn ($w) => $w->productionOrder->product_id.'|'.$w->stage.'|'.$w->rate)
+            ->map(fn ($rows) => (object) [
+                'item' => $rows->first()->productionOrder->product->name,
+                'stage' => $rows->first()->stage_label,
+                'pcs' => $rows->sum(fn ($w) => (float) $w->quantity),
+                'rate' => (float) $rows->first()->rate,
+                'amount' => $rows->sum(fn ($w) => (float) $w->amount),
+            ])
+            ->sortBy('item')
+            ->values();
+
+        return view('admin.payroll-runs.payslip', compact('item', 'company', 'pieceLines'));
     }
 }
