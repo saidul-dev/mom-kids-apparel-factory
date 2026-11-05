@@ -66,3 +66,25 @@ trix-editor:focus {
     .hero-in { animation: none; opacity: 1; }
     .hero-blob { animation: none; }
 }
+
+/* Phone app shell (Production Supervisor below lg — see User::usesAppShell()) */
+@keyframes appPageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes appLoading { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+@media (max-width: 1023.98px) {
+    .app-shell { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+    .app-shell a, .app-shell button, .app-shell label, .app-shell summary { touch-action: manipulation; }
+    /* iOS zooms into any field under 16px; keep the large number fields as they are */
+    .app-shell :is(input, select, textarea):not([class*="text-lg"]):not([class*="text-xl"]):not([class*="text-2xl"]) { font-size: 16px; }
+    .app-shell main { animation: appPageIn .2s ease-out; }
+    .app-shell .tap { transition: transform .12s ease, background-color .12s ease; }
+    .app-shell .tap:active { transform: scale(.97); }
+    .app-loading { position: fixed; inset: 0 0 auto; z-index: 60; height: 3px; overflow: hidden; pointer-events: none; }
+    .app-loading::after { content: ''; display: block; width: 40%; height: 100%; background: theme('colors.accent.400'); animation: appLoading .9s ease-in-out infinite; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-shell main { animation: none; }
+    .app-shell .tap:active { transform: none; }
+    .app-loading::after { animation: none; width: 100%; opacity: .7; }
+}

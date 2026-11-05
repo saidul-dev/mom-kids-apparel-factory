@@ -21,7 +21,7 @@
     // instead of the sidebar and topbar; large screens keep this layout.
     $appMode = auth()->user()->usesAppShell();
 @endphp
-<body class="font-sans antialiased bg-slate-100 {{ $appMode ? 'max-lg:bg-slate-50' : '' }}" x-data="{ sidebarOpen: false }">
+<body class="font-sans antialiased bg-slate-100 {{ $appMode ? 'app-shell max-lg:bg-slate-50' : '' }}" x-data="{ sidebarOpen: false }">
     <div class="min-h-screen">
 
         <!-- Mobile sidebar backdrop -->
@@ -788,7 +788,7 @@
             @if ($tab === null)
                 @can('production.create')
                 <a href="{{ route('production-orders.create') }}" aria-label="{{ __('New production') }}"
-                    class="group relative flex flex-col items-center justify-end focus-visible:outline-none">
+                    class="tap group relative flex flex-col items-center justify-end focus-visible:outline-none">
                     <span class="absolute -top-5 grid h-14 w-14 place-items-center rounded-full text-white shadow-lg shadow-accent-500/40 ring-4 ring-white group-focus-visible:ring-accent-200
                         {{ request()->routeIs('production-orders.create') ? 'bg-accent-600' : 'bg-accent-500' }}">
                         <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke-width="2.4" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
@@ -801,7 +801,7 @@
             @else
                 @php $on = request()->routeIs($tab['active']); @endphp
                 <a href="{{ route($tab['route']) }}" @if ($on) aria-current="page" @endif
-                    class="flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium focus-visible:outline-none focus-visible:bg-slate-50 {{ $on ? 'text-brand-800' : 'text-slate-400' }}">
+                    class="tap flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium focus-visible:outline-none focus-visible:bg-slate-50 {{ $on ? 'text-brand-800' : 'text-slate-400' }}">
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="{{ $on ? 2 : 1.6 }}" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $tab['icon'] }}"/></svg>
                     <span>{{ $tab['label'] }}</span>
                     <span class="h-1 w-1 rounded-full {{ $on ? 'bg-accent-500' : 'bg-transparent' }}"></span>
@@ -810,6 +810,24 @@
             @endforeach
         </div>
     </nav>
+
+    <!-- Thin top bar while the next page loads, so a tap never looks ignored -->
+    <div id="app-loading" class="app-loading lg:hidden" hidden></div>
+    <script>
+        (() => {
+            const bar = document.getElementById('app-loading');
+            const show = () => { if (window.innerWidth < 1024) bar.hidden = false; };
+            document.addEventListener('click', (e) => {
+                const a = e.target.closest('a[href]');
+                if (! a || e.defaultPrevented || a.target === '_blank' || a.hasAttribute('download') || e.metaKey || e.ctrlKey) return;
+                const url = new URL(a.href, location.href);
+                if (url.origin !== location.origin || (url.pathname === location.pathname && url.search === location.search && url.hash)) return;
+                show();
+            });
+            document.addEventListener('submit', (e) => { if (! e.defaultPrevented) show(); });
+            window.addEventListener('pageshow', () => { bar.hidden = true; });
+        })();
+    </script>
     @endif
 </body>
 

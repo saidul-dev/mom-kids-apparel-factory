@@ -136,7 +136,7 @@
         <!-- Services -->
         <div class="mt-5 grid grid-cols-4 gap-2 rounded-3xl bg-white p-4 ring-1 ring-slate-200">
             @foreach ($tiles as $tile)
-            <a href="{{ $tile['href'] }}" class="flex flex-col items-center gap-2 rounded-2xl p-1 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500">
+            <a href="{{ $tile['href'] }}" class="tap flex flex-col items-center gap-2 rounded-2xl p-1 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500">
                 <span class="grid h-14 w-14 place-items-center rounded-2xl {{ $tile['tint'] }}">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $tile['icon'] }}"/></svg>
                 </span>
@@ -154,7 +154,7 @@
             </div>
             <div class="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200">
                 @forelse ($floorActivity as $entry)
-                <a href="{{ route('production-orders.show', $entry->productionOrder) }}" class="flex items-center gap-3 px-4 py-3 active:bg-slate-50">
+                <a href="{{ route('production-orders.show', $entry->productionOrder) }}" class="tap flex items-center gap-3 px-4 py-3 active:bg-slate-50">
                     <span class="h-9 w-1.5 shrink-0 rounded-full {{ $stageLook[$entry->stage]['bar'] }}"></span>
                     <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-semibold text-slate-800">{{ $entry->productionOrder->item_label }}</p>
