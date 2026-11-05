@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CompanySetting;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Site;
@@ -21,7 +22,7 @@ class StockTransferController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:inventory.view', only: ['index', 'show']),
+            new Middleware('permission:inventory.view', only: ['index', 'show', 'print']),
             new Middleware('permission:inventory.create', only: ['create', 'store']),
             new Middleware('permission:inventory.approve', only: ['receive']),
             new Middleware('permission:inventory.edit', only: ['cancel']),
@@ -164,6 +165,21 @@ class StockTransferController extends Controller implements HasMiddleware
         ]);
 
         return view('admin.stock.transfers.show', compact('transfer'));
+    }
+
+    /**
+     * Printable transfer bill (challan) that travels with the goods: every
+     * line at the cost it carries to the receiving Site, with the total.
+     */
+    public function print(StockTransfer $transfer)
+    {
+        $transfer->load([
+            'fromSite', 'toSite', 'dispatchedBy', 'receivedBy',
+            'items.product.stockUnit', 'items.productVariant.attributeValues',
+        ]);
+        $company = CompanySetting::current();
+
+        return view('admin.stock.transfers.print', compact('transfer', 'company'));
     }
 
     /**

@@ -110,6 +110,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/stock/transfers/create', [StockTransferController::class, 'create'])->name('stock.transfers.create');
         Route::post('/stock/transfers', [StockTransferController::class, 'store'])->name('stock.transfers.store');
         Route::get('/stock/transfers/{transfer}', [StockTransferController::class, 'show'])->name('stock.transfers.show');
+        Route::get('/stock/transfers/{transfer}/print', [StockTransferController::class, 'print'])->name('stock.transfers.print');
         Route::post('/stock/transfers/{transfer}/receive', [StockTransferController::class, 'receive'])->name('stock.transfers.receive');
         Route::post('/stock/transfers/{transfer}/cancel', [StockTransferController::class, 'cancel'])->name('stock.transfers.cancel');
 
