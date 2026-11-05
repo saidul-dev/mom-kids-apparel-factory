@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\LedgerAccount;
+use App\Models\Party;
 use App\Models\Product;
 use App\Models\ProductionOrder;
 use App\Models\Site;
@@ -181,6 +182,67 @@ class ProductionOrderTest extends TestCase
         $this->assertEquals(1000, $this->balance('production_wastage_expense'));
 
         $this->stage($order, 'sewing', 1)->assertSessionHas('error');
+    }
+
+    private function outsideWork(ProductionOrder $order, array $data)
+    {
+        return $this->post(route('production-orders.outside-work.store', $order), $data + [
+            'work_type' => 'Embroidery',
+            'entry_date' => '2026-10-03',
+        ]);
+    }
+
+    public function test_outside_work_adds_to_the_finished_piece_cost_and_is_owed_to_the_vendor(): void
+    {
+        $vendor = Party::create(['name' => 'Rahim Embroidery', 'phone' => '01700000001', 'is_supplier' => true, 'status' => true]);
+        $this->createProduction();
+        $order = ProductionOrder::firstOrFail();
+
+        // 500 pcs × 20 per piece = 10,000 — the total is worked out, even
+        // if a different amount is posted alongside the price.
+        $this->outsideWork($order, ['party_id' => $vendor->id, 'quantity' => 500, 'unit_price' => 20, 'amount' => 1])
+            ->assertSessionHasNoErrors();
+        // A flat total, no price per piece.
+        $this->outsideWork($order, ['party_id' => $vendor->id, 'work_type' => 'Print', 'amount' => 5000])
+            ->assertSessionHasNoErrors();
+
+        $this->assertEquals([10000, 5000], $order->outsideWorks()->orderBy('id')->pluck('amount')->map(fn ($a) => (float) $a)->all());
+        $this->assertEquals(65000, $order->wipValue());
+        $this->assertEquals(-15000, $this->balance('accounts_payable'));
+        $this->assertEquals(
+            -15000,
+            (float) LedgerAccount::where('code', 'accounts_payable')->firstOrFail()->lines()
+                ->where('party_id', $vendor->id)->selectRaw('SUM(debit) - SUM(credit) as bal')->value('bal')
+        );
+
+        // (50,000 silk + 15,000 outside work) ÷ 500 pcs = 130 per piece.
+        $this->stage($order, 'sewing', 500);
+        $this->stage($order, 'finishing', 500);
+        $this->stage($order, 'packing', 500);
+
+        $this->assertEquals(130, (float) $this->frock->fresh()->estimated_cost);
+        $this->assertEquals(0, $this->balance('work_in_progress'));
+
+        $this->get(route('production-orders.show', $order))->assertOk()
+            ->assertSee('Rahim Embroidery')
+            ->assertSee('15,000.00');
+    }
+
+    public function test_outside_work_needs_a_supplier_and_a_price_or_total(): void
+    {
+        $customer = Party::create(['name' => 'A Customer', 'phone' => '01700000002', 'is_customer' => true, 'status' => true]);
+        $vendor = Party::create(['name' => 'Print House', 'phone' => '01700000003', 'is_supplier' => true, 'status' => true]);
+        $this->createProduction();
+        $order = ProductionOrder::firstOrFail();
+
+        $this->outsideWork($order, ['party_id' => $vendor->id])->assertSessionHasErrorsIn('outsideWork', 'amount');
+        $this->outsideWork($order, ['party_id' => $vendor->id, 'unit_price' => 20])->assertSessionHasErrorsIn('outsideWork', 'quantity');
+        $this->outsideWork($order, ['party_id' => $customer->id, 'amount' => 100])->assertSessionHasErrorsIn('outsideWork', 'party_id');
+        $this->assertSame(0, $order->outsideWorks()->count());
+
+        $this->post(route('production-orders.complete', $order));
+        $this->outsideWork($order, ['party_id' => $vendor->id, 'amount' => 100])->assertSessionHas('error');
+        $this->assertSame(0, $order->outsideWorks()->count());
     }
 
     public function test_production_screens_render(): void

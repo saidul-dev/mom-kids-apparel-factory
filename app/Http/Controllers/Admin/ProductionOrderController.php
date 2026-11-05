@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Concerns\ResolvesStockItems;
 use App\Http\Controllers\Controller;
+use App\Models\Party;
 use App\Models\ProductionOrder;
 use App\Models\ProductionStageEntry;
 use App\Models\Site;
@@ -31,6 +32,8 @@ use Illuminate\Validation\ValidationException;
  *   at its average cost; Debit Work in Progress / Credit Inventory.
  * - Blister/Poly → `production` in of the finished item, costed at the lot's
  *   WIP value ÷ pieces still in WIP; Debit Inventory / Credit WIP.
+ * - Outside work (embroidery, print...) → Debit WIP / Credit Accounts
+ *   Payable (the vendor), so it lands in the finished pieces' cost.
  * - Complete → any WIP left (pieces cut but never finished) is written
  *   off; Debit Production Wastage / Credit WIP.
  */
@@ -42,7 +45,7 @@ class ProductionOrderController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:inventory.view', only: ['index', 'show']),
-            new Middleware('permission:inventory.create', only: ['create', 'store', 'storeStage']),
+            new Middleware('permission:inventory.create', only: ['create', 'store', 'storeStage', 'storeOutsideWork']),
             new Middleware('permission:inventory.approve', only: ['complete']),
         ];
     }
@@ -194,6 +197,8 @@ class ProductionOrderController extends Controller implements HasMiddleware
             'stageEntries.createdBy',
             'stageEntries.materials.product.stockUnit',
             'stageEntries.materials.productVariant.attributeValues',
+            'outsideWorks' => fn ($q) => $q->orderByDesc('entry_date')->orderByDesc('id'),
+            'outsideWorks.party',
         ]);
 
         $totals = $productionOrder->stageTotals();
@@ -208,8 +213,13 @@ class ProductionOrderController extends Controller implements HasMiddleware
         $accessories = $materials->where('stage', '!=', 'cutting')->values();
         $materialCost = round($materials->sum(fn ($m) => (float) $m->quantity * (float) $m->unit_cost), 2);
 
+        $outsideCost = round((float) $productionOrder->outsideWorks->sum('amount'), 2);
+
         $materialOptions = $productionOrder->isOpen()
             ? $this->stockItemOptions($productionOrder->site_id, true, 'raw_material')
+            : collect();
+        $vendors = $productionOrder->isOpen()
+            ? Party::where('is_supplier', true)->where('status', true)->orderBy('name')->get(['id', 'name'])
             : collect();
 
         return view('admin.production.show', [
@@ -222,8 +232,73 @@ class ProductionOrderController extends Controller implements HasMiddleware
             'fabrics' => $fabrics,
             'accessories' => $accessories,
             'materialCost' => $materialCost,
+            'outsideCost' => $outsideCost,
             'materialOptions' => $materialOptions,
+            'vendors' => $vendors,
         ]);
+    }
+
+    /**
+     * Third-party work on the lot (embroidery, print...). With a price per
+     * piece the amount is pieces × price; otherwise the total is entered
+     * as is. It is owed to the vendor and joins the lot's WIP, so the
+     * pieces packed after it carry its cost.
+     */
+    public function storeOutsideWork(Request $request, ProductionOrder $productionOrder)
+    {
+        if (! $productionOrder->isOpen()) {
+            return back()->with('error', 'This production is already completed.');
+        }
+
+        $validated = $request->validateWithBag('outsideWork', [
+            'party_id' => ['required', 'integer', 'exists:parties,id'],
+            'work_type' => ['required', 'string', 'max:100'],
+            'quantity' => ['nullable', 'required_with:unit_price', 'numeric', 'min:0.0001'],
+            'unit_price' => ['nullable', 'numeric', 'min:0.0001'],
+            'amount' => ['nullable', 'required_without:unit_price', 'numeric', 'min:0.01'],
+            'entry_date' => ['required', 'date'],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'quantity.required_with' => 'Enter the pieces to work out the total from the price per piece.',
+            'amount.required_without' => 'Enter a price per piece or the total amount.',
+        ]);
+
+        $party = Party::findOrFail($validated['party_id']);
+        if (! $party->is_supplier) {
+            throw ValidationException::withMessages(['party_id' => 'Pick a party marked as a Supplier.'])->errorBag('outsideWork');
+        }
+
+        $amount = isset($validated['unit_price'])
+            ? round((float) $validated['quantity'] * (float) $validated['unit_price'], 2)
+            : round((float) $validated['amount'], 2);
+
+        DB::transaction(function () use ($productionOrder, $validated, $party, $amount) {
+            $productionOrder->outsideWorks()->create([
+                'party_id' => $party->id,
+                'work_type' => $validated['work_type'],
+                'quantity' => $validated['quantity'] ?? null,
+                'unit_price' => $validated['unit_price'] ?? null,
+                'amount' => $amount,
+                'entry_date' => $validated['entry_date'],
+                'note' => $validated['note'] ?? null,
+                'created_by' => Auth::id(),
+            ]);
+
+            LedgerService::post([
+                'type' => 'production',
+                'date' => $validated['entry_date'],
+                'site_id' => $productionOrder->site_id,
+                'narration' => "{$validated['work_type']} by {$party->name} for {$productionOrder->production_no}",
+                'reference' => $productionOrder,
+                'created_by' => Auth::id(),
+                'lines' => [
+                    ['account' => 'work_in_progress', 'debit' => $amount, 'credit' => 0],
+                    ['account' => 'accounts_payable', 'party_id' => $party->id, 'debit' => 0, 'credit' => $amount],
+                ],
+            ]);
+        });
+
+        return back()->with('success', "{$validated['work_type']} cost of ".number_format($amount, 2)." added to {$productionOrder->production_no}.");
     }
 
     /**

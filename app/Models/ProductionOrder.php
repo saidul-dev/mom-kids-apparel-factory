@@ -82,6 +82,11 @@ class ProductionOrder extends Model
         return $this->hasMany(ProductionMaterial::class);
     }
 
+    public function outsideWorks(): HasMany
+    {
+        return $this->hasMany(ProductionOutsideWork::class);
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -180,12 +185,14 @@ class ProductionOrder extends Model
 
     /**
      * Cost sitting in Work-in-Progress for this lot: every material issued
-     * to it, less what Blister/Poly has already moved into finished stock
-     * and whatever was written off on close.
+     * to it plus outside work (embroidery, print...), less what
+     * Blister/Poly has already moved into finished stock and whatever was
+     * written off on close.
      */
     public function wipValue(): float
     {
-        $issued = (float) $this->materials()->selectRaw('COALESCE(SUM(quantity * unit_cost), 0) as v')->value('v');
+        $issued = (float) $this->materials()->selectRaw('COALESCE(SUM(quantity * unit_cost), 0) as v')->value('v')
+            + (float) $this->outsideWorks()->sum('amount');
         $finished = (float) $this->stageEntries()->where('stage', self::FINAL_STAGE)
             ->selectRaw('COALESCE(SUM(quantity * unit_cost), 0) as v')->value('v');
 

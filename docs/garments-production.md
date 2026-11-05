@@ -93,6 +93,16 @@ line posts a `production_consumption` out movement at the item's current
 average cost (balance-checked, never negative) and the entry's total goes
 **Dr Work in Progress / Cr Inventory** (voucher `PRD-…`).
 
+**Outside work** (`production-orders.outside-work.store`, table
+`production_outside_works`): work a third party does on the lot before
+it is finished — embroidery, print, wash… Pick the vendor (a Supplier
+party), the work type, and either pieces × price per piece (the total is
+worked out, on the server too) or just the total. The amount goes
+**Dr Work in Progress / Cr Accounts Payable** (the vendor) and is paid
+later from Accounts → Payments, like a purchase. Being in WIP, it is
+spread over the pieces packed after it is entered — enter it before the
+lot is blistered so every piece carries it.
+
 **Blister / Poly** is the only stage that touches finished stock: it posts a
 `production` in movement of the lot's item at the Site. Cost per piece =
 the lot's WIP value ÷ pieces still in WIP (cut but not yet packed), so
@@ -142,5 +152,6 @@ carry their production cost through to the Outlet unchanged.
 
 - Rejects per stage aren't recorded separately — they surface as wastage
   when the lot is completed.
-- Labour/overhead isn't added to finished-goods cost (materials only).
+- In-house labour/overhead isn't added to finished-goods cost (materials
+  and outside work only).
 - Partial delivery and sales returns.

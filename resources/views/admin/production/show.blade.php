@@ -163,6 +163,12 @@
                 @if ($cut > 0)
                 <div class="flex justify-between"><dt class="text-slate-500">{{ __('Material cost / pc') }}</dt><dd class="font-semibold text-slate-800">{{ number_format($materialCost / $cut, 2) }}</dd></div>
                 @endif
+                @if ($outsideCost > 0)
+                <div class="flex justify-between"><dt class="text-slate-500">{{ __('Outside work') }}</dt><dd class="font-semibold text-slate-800">{{ number_format($outsideCost, 2) }}</dd></div>
+                @if ($cut > 0)
+                <div class="flex justify-between border-t border-slate-100 pt-3"><dt class="text-slate-500">{{ __('Total cost / pc') }}</dt><dd class="font-semibold text-slate-800">{{ number_format(($materialCost + $outsideCost) / $cut, 2) }}</dd></div>
+                @endif
+                @endif
                 @php
                     $fabricUnits = $fabrics->map(fn ($m) => $m->product->stockUnit?->short_name)->filter()->unique();
                 @endphp
@@ -179,6 +185,131 @@
             @endif
         </div>
     </div>
+
+    <!-- Outside work: embroidery, print... done by a third party -->
+    @php
+        $owErrors = $errors->outsideWork;
+        $owOld = old('work_type') !== null;
+    @endphp
+    @if ($order->outsideWorks->isNotEmpty() || $order->isOpen())
+    <div class="mb-4 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div class="border-b border-slate-100 px-5 py-3">
+            <h3 class="text-sm font-semibold text-slate-800">{{ __('Outside Work (Embroidery, Print…)') }}</h3>
+            <p class="text-xs text-slate-400">{{ __('Work done by another party before finishing — its cost is added to the per-piece cost.') }}</p>
+        </div>
+        @if ($order->outsideWorks->isNotEmpty())
+        <div class="overflow-x-auto">
+        <table class="w-full min-w-[620px] text-sm">
+            <thead>
+                <tr class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <th class="px-5 py-2.5 font-semibold">{{ __('Date') }}</th>
+                    <th class="px-5 py-2.5 font-semibold">{{ __('Work') }}</th>
+                    <th class="px-5 py-2.5 font-semibold">{{ __('Vendor') }}</th>
+                    <th class="px-5 py-2.5 font-semibold text-right">{{ __('Pieces') }}</th>
+                    <th class="px-5 py-2.5 font-semibold text-right">{{ __('Price / pc') }}</th>
+                    <th class="px-5 py-2.5 font-semibold text-right">{{ __('Total') }}</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach ($order->outsideWorks as $work)
+                <tr>
+                    <td class="px-5 py-2.5 text-slate-600">{{ $work->entry_date->format('d M, Y') }}</td>
+                    <td class="px-5 py-2.5 font-semibold text-slate-800">
+                        {{ $work->work_type }}
+                        @if ($work->note)<span class="block text-xs font-normal text-slate-400">{{ $work->note }}</span>@endif
+                    </td>
+                    <td class="px-5 py-2.5 text-slate-600">{{ $work->party->name ?? '—' }}</td>
+                    <td class="px-5 py-2.5 text-right text-slate-800">{{ $work->quantity !== null ? $qty($work->quantity) : '—' }}</td>
+                    <td class="px-5 py-2.5 text-right text-slate-600">{{ $work->unit_price !== null ? number_format($work->unit_price, 2) : '—' }}</td>
+                    <td class="px-5 py-2.5 text-right font-semibold text-slate-800">{{ number_format($work->amount, 2) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr class="bg-slate-50">
+                    <td colspan="5" class="px-5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Total') }}</td>
+                    <td class="px-5 py-2.5 text-right font-bold text-slate-800">{{ number_format($outsideCost, 2) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+        </div>
+        @endif
+
+        @if ($order->isOpen())
+        @can('inventory.create')
+        <form method="POST" action="{{ route('production-orders.outside-work.store', $order) }}"
+              x-data="{
+                  qty: @js($owOld ? old('quantity') : ''),
+                  price: @js($owOld ? old('unit_price') : ''),
+                  amount: @js($owOld ? old('amount') : ''),
+                  get byPrice() { return this.price !== '' && this.price !== null },
+                  get total() { return this.byPrice ? ((parseFloat(this.qty) || 0) * (parseFloat(this.price) || 0)).toFixed(2) : this.amount },
+              }"
+              class="border-t border-slate-100 p-5">
+            @csrf
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <x-input-label for="ow_work_type" :value="__('Work')" />
+                    <x-text-input id="ow_work_type" name="work_type" type="text" list="ow_work_types" class="mt-1 block w-full"
+                                  :value="old('work_type')" placeholder="{{ __('Embroidery, Print…') }}" required />
+                    <datalist id="ow_work_types">
+                        @foreach (\App\Models\ProductionOutsideWork::WORK_TYPES as $type)
+                        <option value="{{ $type }}">
+                        @endforeach
+                    </datalist>
+                    <x-input-error class="mt-2" :messages="$owErrors->get('work_type')" />
+                </div>
+                <div class="lg:col-span-2">
+                    <x-input-label for="party_id" :value="__('Vendor')" />
+                    <div class="mt-1">
+                        <x-searchable-select name="party_id" :options="$vendors" :selected="$owOld ? old('party_id') : null"
+                                             placeholder="{{ __('Select a supplier…') }}" />
+                    </div>
+                    <x-input-error class="mt-2" :messages="$owErrors->get('party_id')" />
+                </div>
+                <div>
+                    <x-input-label for="ow_date" :value="__('Date')" />
+                    <x-text-input id="ow_date" name="entry_date" type="date" class="mt-1 block w-full"
+                                  :value="$owOld ? old('entry_date') : now()->toDateString()" required />
+                    <x-input-error class="mt-2" :messages="$owErrors->get('entry_date')" />
+                </div>
+
+                <div>
+                    <x-input-label for="ow_quantity" :value="__('Pieces')" />
+                    <input id="ow_quantity" name="quantity" type="number" step="1" min="1" x-model="qty" :required="byPrice"
+                           class="mt-1 block w-full rounded-lg border-slate-300 text-right text-sm focus:border-accent-500 focus:ring-accent-500" placeholder="0">
+                    <x-input-error class="mt-2" :messages="$owErrors->get('quantity')" />
+                </div>
+                <div>
+                    <x-input-label for="ow_unit_price" :value="__('Price / pc (optional)')" />
+                    <input id="ow_unit_price" name="unit_price" type="number" step="0.01" min="0.01" x-model="price"
+                           class="mt-1 block w-full rounded-lg border-slate-300 text-right text-sm focus:border-accent-500 focus:ring-accent-500" placeholder="0.00">
+                    <x-input-error class="mt-2" :messages="$owErrors->get('unit_price')" />
+                </div>
+                <div>
+                    <x-input-label for="ow_amount" :value="__('Total amount')" />
+                    {{-- With a price the total is worked out (and recomputed on the server); otherwise it is typed in. --}}
+                    <input id="ow_amount" type="number" step="0.01" min="0.01" :value="total" @input="amount = $event.target.value"
+                           :readonly="byPrice" :required="!byPrice" :name="byPrice ? null : 'amount'"
+                           :class="byPrice ? 'bg-slate-50 text-slate-500' : ''"
+                           class="mt-1 block w-full rounded-lg border-slate-300 text-right text-sm font-semibold focus:border-accent-500 focus:ring-accent-500" placeholder="0.00">
+                    <p class="mt-1 text-xs text-slate-400" x-show="byPrice" x-cloak>{{ __('Pieces × price') }}</p>
+                    <x-input-error class="mt-2" :messages="$owErrors->get('amount')" />
+                </div>
+                <div>
+                    <x-input-label for="ow_note" :value="__('Note')" />
+                    <x-text-input id="ow_note" name="note" type="text" class="mt-1 block w-full" :value="$owOld ? old('note') : ''" />
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <button type="submit" class="rounded-lg bg-brand-800 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">{{ __('Add Outside Work') }}</button>
+                <span class="text-xs text-slate-400">{{ __('Owed to the vendor — pay it from Accounts → Payments.') }}</span>
+            </div>
+        </form>
+        @endcan
+        @endif
+    </div>
+    @endif
 
     @if ($order->isOpen())
     @can('inventory.create')

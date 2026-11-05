@@ -120,6 +120,7 @@ Route::prefix('admin')->group(function () {
         Route::resource('production-orders', ProductionOrderController::class)->only(['index', 'create', 'store', 'show'])
             ->parameters(['production-orders' => 'productionOrder']);
         Route::post('/production-orders/{productionOrder}/stages', [ProductionOrderController::class, 'storeStage'])->name('production-orders.stages.store');
+        Route::post('/production-orders/{productionOrder}/outside-work', [ProductionOrderController::class, 'storeOutsideWork'])->name('production-orders.outside-work.store');
         Route::post('/production-orders/{productionOrder}/complete', [ProductionOrderController::class, 'complete'])->name('production-orders.complete');
 
         // Customer orders from the Factory / wholesale Outlet: Order -> Deliver.
